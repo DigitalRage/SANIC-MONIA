@@ -3,7 +3,6 @@ import time
 import random
 import os
 
-
 import sys
 import termios
 import tty
@@ -18,10 +17,8 @@ key_queue = queue.Queue()
 # Dictionary to track the state of held keys
 key_state = {key: False for key in ["w", "a", "s", "d", " ","*","/","1","2","3","4","5","6","7","8","9","0","f"]}
 
-
 def getch():
 	return readchar.readkey()
-
 
 def get_input_thread():
 	"""
@@ -44,7 +41,6 @@ def get_input_thread():
 			return
 			
 
-
 def start_input_thread():
 	"""Sets up and starts the input thread."""
 	input_thread1 = threading.Thread(target=get_input_thread, daemon=True)
@@ -60,7 +56,6 @@ def start_input_thread():
 	else:
 		input_thread1=input_thread1
 	return input_thread1
-
 
 def get_key():
 	"""
@@ -4938,15 +4933,15 @@ board=[
 "                                                                                              █",
 "                                                                                              █",
 "                                                                                              █",
-"                                                                                              █",
-"                                                                                              █",
+"                                          ╔╧╗                                                 █",
+"                                          ║◉║                                                 █",
 "                                         ███████                                              █",
 "                                                                                              █",
 "                                      █                                                       █",
 "                                                                                              █",
 "                                         █                                                    █",
 "                                             █                                                █",
-"                                                █                                             █",
+"                                                 █                                            █",
 "                                                                                              █",
 "                                                    ████                                      █",
 "                                                                                              █",
@@ -4959,7 +4954,6 @@ board=[
 "███████████████████████████████████████████████████████████████████████████████████████████████",
 "███████████████████████████████████████████████████████████████████████████████████████████████"]
 
-
 BOARD_SAVE=board
 BOARD_HEIGHT = len(board)
 BOARD_WIDTH = len(board[0])
@@ -4968,7 +4962,6 @@ VIEW_WIDTH=95
 button_on=["⑴","⑵","⑶","⑷","⑸","⑹","⑺","⑻","⑼","⑽","⑾","⑿","⒀","⒁","⒂","⒃","⒄","⒅","⒆","⒇"]
 ground_on=["➊","➋","➌","➍","➎","➏","➐","➑","➒","➓","⓫","⓬","⓭","⓮","⓯","⓰","⓱","⓲","⓳","⓴"]
 ground_off=["①","②","③","④","⑤","⑥","⑦","⑧","⑨","⑩","⑪","⑫","⑬","⑭","⑮","⑯","⑰","⑱","⑲","⑳"]
-
 
 def check_ground(check_cord):
     if check_cord  in ground_on:
@@ -5005,12 +4998,10 @@ def board_eval(current_board, button_status):
 		out2.append(out1)
 	return out2
 ### this is where errors happen ###
-
-
-
+#def make_projectile(xoragin,yoragin,directon):
+    
 
 board_val = board_eval(board, botton_status)
-
 
 def get_map(inboard):
 	"""Converts a list of strings into a list of lists of characters."""
@@ -5020,7 +5011,6 @@ def get_map(inboard):
 		x.append(row)
 	return x
 
-
 def get_map_shown(playery, playerx):
 	"""Returns a slice of the board centered around the player's position."""
 	upper_bound_y = max(0, playery - VIEW_HEIGHT // 2)
@@ -5029,13 +5019,11 @@ def get_map_shown(playery, playerx):
 		lower_bound_y = BOARD_HEIGHT
 		upper_bound_y = max(0, BOARD_HEIGHT - VIEW_HEIGHT)
 
-
 	upper_bound_x = max(0, playerx - VIEW_WIDTH // 2)
 	lower_bound_x = upper_bound_x + VIEW_WIDTH
 	if lower_bound_x > BOARD_WIDTH:
 		lower_bound_x = BOARD_WIDTH
 		upper_bound_x = max(0, BOARD_WIDTH - VIEW_WIDTH)
-
 
 	visible_map_str = []
 	for y in range(upper_bound_y, lower_bound_y):
@@ -5045,14 +5033,11 @@ def get_map_shown(playery, playerx):
 	return visible_map_str, upper_bound_x, upper_bound_y
 
 
-
-
 def print_buffer(buffer):
 	"""Prints the buffer content to the console."""
 	os.system('cls' if os.name == 'nt' else 'clear')
 	for line in buffer:
 		print("".join(line))
-
 
 def board_game_loop(playerx, playery):
 	global debugging
@@ -5062,7 +5047,6 @@ def board_game_loop(playerx, playery):
 	
 	local_playery = playery - view_y_start
 	local_playerx = playerx - view_x_start
-
 
 	# Ensure player position is within the buffer boundaries
 	if 0 <= local_playery < len(buffer) and 0 <= local_playerx < len(buffer[local_playery]):
@@ -5086,7 +5070,6 @@ curant_pos_prev:{curant_pos_prev}
 move:{move}
 pause:{pause}""")
 
-
 # Main game loop
 while True:
 	try:
@@ -5109,11 +5092,12 @@ while True:
 				vol+=.5
 			if (move == " " or move == "w") and on_ground:
 				vol = .5
-			
+			# handle players gun
+			#if move=="e":
+				
 			# Apply gravity
 			if vol > -2:
 				vol -= .125
-
 
 			# Check for a collision on the next Y position
 			if vol != 0:
@@ -5131,7 +5115,6 @@ while True:
 						break
 					else:
 						ycheck=True
-
 
 			# --- Handle Horizontal Movement ---
 			next_x = playerx
@@ -5153,22 +5136,18 @@ while True:
 				elif board_val[playery][next_x]!="g":
 					playerx=next_x
 
-
 			# --- Update Collision Flags ---
 			on_ground = playery + 1 < BOARD_HEIGHT and board_val[playery + 1][playerx] == "g" or check_ground(board_val[playery+1][playerx])
-
 
 			if playerx > 0:
 				move_left = board_val[playery][playerx - 1] != "g" or check_ground(board_val[playery][playerx-1])
 			else:
 				move_left = False
 
-
 			if playerx < BOARD_WIDTH - 1:
 				move_right = board_val[playery][playerx + 1] != "g" or check_ground(board_val[playery][playerx+1])
 			else:
 				move_right = False
-
 
 			
 			# --- Render the Game Frame ---
@@ -5212,6 +5191,3 @@ while True:
 	if win:
 		break
 print("you win")
-
-
-
