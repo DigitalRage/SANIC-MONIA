@@ -5044,7 +5044,7 @@ def print_buffer(buffer):
 	"""Prints the buffer content to the console."""
 	os.system('cls' if os.name == 'nt' else 'clear')
 	for line in buffer:
-		print("".join(line))
+		print("".join(line),end="")
 
 def board_game_loop(playerx, playery):
 	global debugging
