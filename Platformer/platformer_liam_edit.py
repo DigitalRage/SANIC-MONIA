@@ -9,7 +9,7 @@ import tty
 import threading
 import queue
 import time
-import readchar
+
 # Event to signal the input thread to stop
 stop_event = threading.Event()
 # Thread-safe queue for key presses
@@ -18,7 +18,14 @@ key_queue = queue.Queue()
 key_state = {key: False for key in ["w", "a", "s", "d", " ","*","/","1","2","3","4","5","6","7","8","9","0","f"]}
 
 def getch():
-	return readchar.readkey()
+	fd = sys.stdin.fileno()
+	old_settings = termios.tcgetattr(fd)
+	try:
+		tty.setraw(sys.stdin.fileno())
+		ch = sys.stdin.read(1)
+	finally:
+		termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+	return ch
 
 def get_input_thread():
 	"""
