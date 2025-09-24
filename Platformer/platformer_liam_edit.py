@@ -4971,10 +4971,10 @@ ground_on=["➊","➋","➌","➍","➎","➏","➐","➑","➒","➓","⓫","�
 ground_off=["①","②","③","④","⑤","⑥","⑦","⑧","⑨","⑩","⑪","⑫","⑬","⑭","⑮","⑯","⑰","⑱","⑲","⑳"]
 
 def check_ground(check_cord):
-    if check_cord  in ground_on:
-        return True
-    else:
-        return False
+	if check_cord  in ground_on:
+		return True
+	else:
+		return False
 ### this is where errors happen ###
 def board_eval(current_board, button_status):
 	"""Evaluates the board based on button status and returns the value grid."""
@@ -5006,7 +5006,7 @@ def board_eval(current_board, button_status):
 	return out2
 ### this is where errors happen ###
 #def make_projectile(xoragin,yoragin,directon):
-    
+	
 
 board_val = board_eval(board, botton_status)
 
@@ -5043,8 +5043,12 @@ def get_map_shown(playery, playerx):
 def print_buffer(buffer):
 	"""Prints the buffer content to the console."""
 	os.system('cls' if os.name == 'nt' else 'clear')
+	collom,row=os.get_terminal_size()
+	nextline=""
+	for x in range(0,collom-BOARD_WIDTH):
+		nextline=nextline+" "
 	for line in buffer:
-		print("".join(line),end="")
+		print("".join(line),end=nextline)
 
 def board_game_loop(playerx, playery):
 	global debugging
