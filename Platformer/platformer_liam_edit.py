@@ -9,13 +9,37 @@ import tty
 import threading
 import queue
 import time
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+sender_email = "liam.perl@ucas-edu.net"
+receiver_email = "liam.perl@ucas-edu.net"
+subject = "debugging"
+password="vqcr qsia clad ogat"
+message = MIMEMultipart()
+message["From"] = sender_email
+message["To"] = receiver_email
+message["Subject"] = subject
+
+smtp_server = "smtp.gmail.com" # Or your email provider's SMTP server
+port = 587 # Or your email provider's port (often 465 for SSL or 587 for TLS)
+def email_debug(body):
+	message.attach(MIMEText(str(body), "plain"))
+	try:
+		with smtplib.SMTP(smtp_server, port) as server:
+			server.starttls()  # Secure the connection
+			server.login(sender_email, password)
+			server.send_message(message)
+		print("Email sent successfully!")
+	except Exception as e:
+		print(f"Error sending email: {e}")
 
 # Event to signal the input thread to stop
 stop_event = threading.Event()
 # Thread-safe queue for key presses
 key_queue = queue.Queue()
 # Dictionary to track the state of held keys
-key_state = {key: False for key in ["w", "a", "s", "d", " ","*","/","1","2","3","4","5","6","7","8","9","0","f"]}
+key_state = {key: False for key in ["w", "a", "s", "d", " ","*","/","1","2","3","4","5","6","7","8","9","0","f","r","~"]}
 
 def getch():
 	fd = sys.stdin.fileno()
@@ -5079,10 +5103,18 @@ savex:{savex}
 savey:{savey}
 curant_pos_prev:{curant_pos_prev}
 move:{move}
-pause:{pause}""")
-
+pause:{pause}
+recording?:{reccored}
+email sent:{email_sent}
+email count:{email_count}""")
+debug_log=[]
+tic=0
+reccored=False
+email_sent=False
+email_count=0
 # Main game loop
 while True:
+	tic+=1
 	try:
 		input_thread = start_input_thread()
 		print("Program started. Press WASD. Press Ctrl+C to exit.")
@@ -5098,6 +5130,19 @@ while True:
 			if move =="*":
 				debugging=not debugging
 				print(f"debugging {debugging}")
+			if move=="r" and debugging:
+				reccored=True
+			if reccored:
+				print("recording")
+				debug_log.append([botton_status,on_ground,move_left,move_right,invincible,win,debugging,vol,curant_pos,playerx,playery,savex,savey,curant_pos_prev,move,pause,tic])
+			if move =="~" and debugging:
+				print("sending email")
+				email_debug(debug_log)
+				debug_log=[]
+				email_sent=True
+				email_count+=1
+				input_thread.join()
+				quit()
 			# --- Handle Jump and Vertical Movement ---
 			if move == "f" and debugging:
 				vol+=.5
@@ -5190,6 +5235,10 @@ while True:
 			if curant_pos == "w":
 				win = True
 				break
+			if reccored:
+				print("recording")
+			if email_sent:
+				print(f"emails sent: {email_count}")
 			time.sleep(0.075)
 				
 	except KeyboardInterrupt:
