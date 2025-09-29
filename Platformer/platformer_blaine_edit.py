@@ -1,206 +1,175 @@
-import threading
-import time
-import os
-import queue
-import readchar
-from the_board import board  # Make sure this file exists and defines `board`
+import threading, time, os, queue, readchar
 
-# Input handling setup
-stop_event = threading.Event()
-key_queue = queue.Queue()
-key_state = {key: False for key in ["w", "a", "s", "d", " ", "*", "/", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "f"]}
+# Viewport and world size
+VIEW_W = 80
+VIEW_H = 20
+WORLD_W = 300
+WORLD_H = VIEW_H
 
-def getch():
-    return readchar.readkey()
+# Physics
+GRAVITY = 10.0
+MOVE_SPEED = 16.0
+JUMP_V = 10.0
+FRAME = 1.0 / 30.0
 
-def get_input_thread():
-    while not stop_event.is_set():
-        try:
-            key_input = getch()
-            if key_input in key_state or key_input in ("q", '\x03', 'k'):
-                key_queue.put(key_input)
-            elif key_input == 'q' or key_input == '\x03':
-                stop_event.set()
-                key_queue.put(None)
-                return
-        except Exception:
-            stop_event.set()
-            return
+# Input queue and state
+inq = queue.Queue()
+last_left = 0.0
+last_right = 0.0
+HOLD_TIMEOUT = 0.18
 
-def start_input_thread():
-    input_thread = threading.Thread(target=get_input_thread, daemon=True)
-    input_thread.start()
-    return input_thread
+SOLID = '█'
 
-def get_key():
-    try:
-        return key_queue.get_nowait()
-    except queue.Empty:
-        return None
-
-# Game constants
-button_on = ["⑴","⑵","⑶","⑷","⑸","⑹","⑺","⑻","⑼","⑽","⑾","⑿","⒀","⒁","⒂","⒃","⒄","⒅","⒆","⒇"]
-ground_on = ["➊","➋","➌","➍","➎","➏","➐","➑","➒","➓","⓫","⓬","⓭","⓮","⓯","⓰","⓱","⓲","⓳","⓴"]
-BOARD_HEIGHT = len(board)
-BOARD_WIDTH = len(board[0])
-VIEW_HEIGHT = 50
-VIEW_WIDTH = 95
-
-# Game state
-botton_status = [True] * 20
-on_ground = True
-move_left = True
-move_right = True
-invincible = False
-win = False
-debugging = False
-vol = 0
-playerx = 2
-playery = 4863
-savex = 2
-savey = playery
-curant_pos = " "
-curant_pos_prev = None
-move = ""
-
-def check_ground(char):
-    return char in ground_on
-
-def board_eval(current_board, button_status):
-    out2 = []
-    for row in current_board:
-        out1 = []
-        for char in row:
-            if char == "█":
-                out1.append("g")
-            elif char in ["◀", "▼", "▶", "▲"]:
-                out1.append("d")
-            elif char == "◉":
-                out1.append("s")
-            elif char == "⚐":
-                out1.append("w")
-            elif char in button_on:
-                count = button_on.index(char)
-                out1.append(f"B{count}")
-            else:
-                is_ground = False
-                for count, g_on_char in enumerate(ground_on):
-                    if char == g_on_char and button_status[count]:
-                        out1.append("g")
-                        is_ground = True
-                        break
-                if not is_ground:
-                    out1.append(" ")
-        out2.append(out1)
-    return out2
-
-def get_map(inboard):
-    return [list(line) for line in inboard]
-
-def get_map_shown(playery, playerx):
-    upper_y = max(0, playery - VIEW_HEIGHT // 2)
-    lower_y = min(BOARD_HEIGHT, upper_y + VIEW_HEIGHT)
-    upper_x = max(0, playerx - VIEW_WIDTH // 2)
-    lower_x = min(BOARD_WIDTH, upper_x + VIEW_WIDTH)
-    visible_map = [board[y][upper_x:lower_x] for y in range(upper_y, lower_y)]
-    return visible_map, upper_x, upper_y
-
-def print_buffer(buffer):
-    os.system('cls' if os.name == 'nt' else 'clear')
-    for line in buffer:
-        print("".join(line))
-
-def board_game_loop(playerx, playery):
-    visible_map, view_x, view_y = get_map_shown(playery, playerx)
-    buffer = get_map(visible_map)
-    local_y = playery - view_y
-    local_x = playerx - view_x
-    if 0 <= local_y < len(buffer) and 0 <= local_x < len(buffer[local_y]):
-        buffer[local_y][local_x] = "🯅"
-    print_buffer(buffer)
-    if debugging:
-        print(f"Debug Info:\nplayerx={playerx}, playery={playery}, vol={vol}, on_ground={on_ground}")
-
-def game_loop():
-    global playerx, playery, vol, on_ground, move_left, move_right, win, curant_pos, curant_pos_prev, debugging, savex, savey
-    input_thread = start_input_thread()
-    print("Game started. Use WASD. Ctrl+C to quit.")
-
-    while not stop_event.is_set():
-        move = get_key()
-        current_board = board[:]
-        board_val = board_eval(current_board, botton_status)
-        next_y = playery
-
-        # Jump and gravity
-        if move == "f" and debugging:
-            vol += 0.5
-        if (move == " " or move == "w") and on_ground:
-            vol = 0.5
-        if vol > -2:
-            vol -= 0.125
-
-        if vol != 0:
-            step = -1 if vol > 0 else 1
-            for _ in range(int(abs(vol * 2)) + 1):
-                candidate_y = next_y + step
-                if candidate_y < 0 or candidate_y >= BOARD_HEIGHT or board_val[candidate_y][playerx] == "g" or check_ground(board_val[candidate_y][playerx]):
-                    vol = 0
-                    on_ground = step > 0
-                    break
-                next_y = candidate_y
-
-        # Horizontal movement
-        next_x = playerx
-        if move == "a" and move_left:
-            next_x -= 1
-        elif move == "d" and move_right:
-            next_x += 1
-        next_x = max(0, min(BOARD_WIDTH - 1, next_x))
-
-        if board_val[next_y][next_x] != "g" and not check_ground(board_val[next_y][next_x]):
-            playerx, playery = next_x, next_y
-
-        # Update flags
-        on_ground = playery + 1 < BOARD_HEIGHT and (board_val[playery + 1][playerx] == "g" or check_ground(board_val[playery + 1][playerx]))
-        move_left = playerx > 0 and (board_val[playery][playerx - 1] != "g" or check_ground(board_val[playery][playerx - 1]))
-        move_right = playerx < BOARD_WIDTH - 1 and (board_val[playery][playerx + 1] != "g" or check_ground(board_val[playery][playerx + 1]))
-
-        # Render
-        board_game_loop(playerx, playery)
-
-        # Events
-        curant_pos = board_val[playery][playerx]
-        if curant_pos.startswith("B") and curant_pos != curant_pos_prev:
-            count = int(curant_pos[1:])
-            botton_status[count] = not botton_status[count]
-            print(f"Button {count + 1} {'on' if botton_status[count] else 'off'}")
-            time.sleep(0.5)
-        curant_pos_prev = curant_pos
-
-        if curant_pos == "d" and not invincible:
-            print("You died!")
-            time.sleep(0.5)
-            playerx, playery = savex, savey
-            vol = 0
-        if curant_pos == "s":
-            savex, savey = playerx, playery
-        if curant_pos == "w":
-            win = True
+def input_reader(q):
+    while True:
+        k = readchar.readkey()
+        q.put(k)
+        if k == 'q':
             break
-        if move == "*":
-            debugging = not debugging
-        if move == "k":
-            print("You died (manual reset).")
-            playerx, playery = savex, savey
-            vol = 0
 
-        time.sleep(0.075)
+# Build an empty world
+def make_world():
+    world = [[' ' for _ in range(WORLD_W)] for _ in range(WORLD_H)]
+    # ground
+    for x in range(WORLD_W):
+        if x % 30 == 29:
+            # make a gap sometimes
+            continue
+        world[WORLD_H - 1][x] = SOLID
+    # platforms pattern
+    for x in range(10, WORLD_W - 10, 12):
+        h = WORLD_H - 3 - ((x // 12) % 4)
+        for px in range(x, min(x + 8, WORLD_W)):
+            world[h][px] = SOLID
+    # taller pillars
+    for x in range(60, 80, 6):
+        for y in range(WORLD_H - 2, WORLD_H - 6, -1):
+            if 0 <= y < WORLD_H and 0 <= x < WORLD_W:
+                world[y][x] = SOLID
+    return world
 
+world = make_world()
+
+def tile_at(tx, ty):
+    if tx < 0 or tx >= WORLD_W or ty < 0 or ty >= WORLD_H:
+        return SOLID
+    return world[ty][tx]
+
+def clear_screen():
+    os.system('cls' if os.name == 'nt' else 'clear')
+
+# Player state
+px = 5.0
+py = WORLD_H - 2.0
+vx = 0.0
+vy = 0.0
+
+running = True
+
+# Start input thread
+t = threading.Thread(target=input_reader, args=(inq,), daemon=True)
+t.start()
+
+def handle_input(now):
+    global last_left, last_right, vx, vy, px, py, running
+    while not inq.empty():
+        k = inq.get_nowait()
+        if k == 'a':
+            last_left = now
+        elif k == 'd':
+            last_right = now
+        elif k == 'w' or k == ' ':
+            if on_ground(px, py):
+                vy = -JUMP_V
+        elif k == 'q':
+            running = False
+    left_active = (now - last_left) < HOLD_TIMEOUT
+    right_active = (now - last_right) < HOLD_TIMEOUT
+    if left_active and not right_active:
+        vx = -MOVE_SPEED
+    elif right_active and not left_active:
+        vx = MOVE_SPEED
+    else:
+        vx = 0.0
+
+def on_ground(x, y):
+    foot_y = int(y + 1)
+    return tile_at(int(x), foot_y) == SOLID
+
+def move_physics(dt):
+    global px, py, vx, vy
+    # horizontal movement: check collisions against player's occupied tiles (top and body)
+    new_x = px + vx * dt
+    top_tile = int(py)
+    body_tile = int(py + 0.9)
+    if tile_at(int(new_x), top_tile) == SOLID or tile_at(int(new_x), body_tile) == SOLID:
+        pass
+    else:
+        px = new_x
+    # gravity and vertical movement
+    vy += GRAVITY * dt
+    new_y = py + vy * dt
+    if vy > 0:
+        foot = int(new_y + 1)
+        if tile_at(int(px), foot) == SOLID:
+            py = foot - 1.0
+            vy = 0.0
+        else:
+            py = new_y
+    elif vy < 0:
+        head = int(new_y)
+        if tile_at(int(px), head) == SOLID:
+            vy = 0.0
+            py = head + 1.0
+        else:
+            py = new_y
+    if py > WORLD_H - 1.0:
+        py = WORLD_H - 1.0
+        vy = 0.0
+    if py < 0.0:
+        py = 0.0
+        vy = 0.0
+
+def render():
+    cam_x = int(px) - VIEW_W // 3
+    cam_x = max(0, min(cam_x, WORLD_W - VIEW_W))
+    out_lines = []
+    for row in range(VIEW_H):
+        line_chars = []
+        wy = row
+        for col in range(VIEW_W):
+            wx = cam_x + col
+            ch = tile_at(wx, wy)
+            line_chars.append(ch)
+        out_lines.append(''.join(line_chars))
+    px_screen = int(px) - cam_x
+    py_screen = int(py)
+    if 0 <= py_screen < VIEW_H and 0 <= px_screen < VIEW_W:
+        line = list(out_lines[py_screen])
+        line[px_screen] = '@'
+        out_lines[py_screen] = ''.join(line)
+    clear_screen()
+    print(' ' + '=' * (VIEW_W - 2))
+    for ln in out_lines:
+        print('|' + ln[:VIEW_W - 2] + '|')
+    print(' ' + '=' * (VIEW_W - 2))
+    print('Controls: a d to move, w or space to jump, q to quit')
+
+# Main loop
+last = time.time()
 try:
-    game_loop()
+    while running:
+        now = time.time()
+        dt = now - last
+        if dt < FRAME:
+            time.sleep(FRAME - dt)
+            now = time.time()
+            dt = now - last
+        last = now
+        handle_input(now)
+        move_physics(dt)
+        render()
 except KeyboardInterrupt:
-    print("Ctrl+C detected. Exiting...")
+    pass
 finally:
-    stop_event.set()
-    print("Game over.")
+    running = False
