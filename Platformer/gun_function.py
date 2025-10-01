@@ -296,8 +296,9 @@ def board_eval(current_board, button_status):
 		out2.append(out1)
 	return out2
 ### this is where errors happen ###
-#def make_projectile(xoragin,yoragin,directon):
-	
+def make_projectile(xoragin,yoragin,directon):
+
+
 
 board_val = board_eval(board, botton_status)
 
@@ -474,6 +475,7 @@ while True:
 			board_game_loop(playerx, playery)
 			
 			# --- Check for Game Events ---
+			check_enemy_atack()
 			move_bullet()
 			curant_pos = board_val[playery][playerx]
 			if curant_pos.startswith("B") and curant_pos != curant_pos_prev:
