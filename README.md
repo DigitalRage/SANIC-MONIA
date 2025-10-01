@@ -1,4 +1,4 @@
-# Celeste, a platformer
+# placeholder, a platformer
 Jump, jump, etc. 
 
 

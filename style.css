@@ -1,13 +1,9 @@
 @font-face {
-	font-family: 'platformer costome font'; /* Choose a descriptive name for your font */
-	src: url('/workspaces/SANIC-MONIA/platformer-Regular (4) (1).otf') format('opentype'); /* Adjust the path to your .otf file */
-	font-weight: normal; /* Or specify other weights like bold, light, etc. */
-	font-style: normal; /* Or italic */
-}
-body {
-    font-family: 'platformer costome font', sans-serif; /* Fallback font recommended */
-}
-
-h1 {
-    font-family: 'platformer costome font', serif;
-}
+	font-family: 'Platformer';
+	src: url('platformer-Regular (4) (1).otf') format('opentype');
+	font-weight: normal;
+	font-style: normal;
+  }
+  body {
+	font-family: 'Platformer', sans-serif;
+  }

@@ -160,8 +160,9 @@ board=[
 "███████████████████████████████████████████████████████████████████████████████████████████████",
 "███████████████████████████████████████████████████████████████████████████████████████████████",
 "███████████████████████████████████████████████████████████████████████████████████████████████"]
-
+player_char="A"
 BOARD_SAVE=board
+bullets=[]
 BOARD_HEIGHT = len(board)
 BOARD_WIDTH = len(board[0])
 VIEW_HEIGHT=50
@@ -179,7 +180,87 @@ def player_aim(direction):
 		player_char="C"
 	if direction=="7" and upgrade[0]==False:
 		player_char="D"
+	if direction=="6" and upgrade[0]==False:
+		player_char="A"
+	if direction=="4" and upgrade[0]==False:
+		player_char="B"
+	if direction=="3" and upgrade[0]==False:
+		player_char="G"
+	if direction=="2" and upgrade[0]==False:
+		player_char="I"
+	if direction=="1" and upgrade[0]==False:
+		player_char="H"
+def move_bullet(direction=None):
+	global board, board_val, bullets
+	# Remove all bullets from board
+	for b in bullets:
+		y, x = b["y"], b["x"]
+		if 0 <= y < BOARD_HEIGHT and 0 <= x < BOARD_WIDTH:
+			if board[y][x] == "•":
+				board[y] = board[y][:x] + " " + board[y][x+1:]
+	# Move bullets
+	new_bullets = []
+	for b in bullets:
+		ny, nx = b["y"] + b["dy"], b["x"] + b["dx"]
+		if 0 <= ny < BOARD_HEIGHT and 0 <= nx < BOARD_WIDTH:
+			if board_val[ny][nx] != "g" and not check_ground(board_val[ny][nx]):
+				board[ny] = board[ny][:nx] + "•" + board[ny][nx+1:]
+				new_bullets.append({"y": ny, "x": nx, "dy": b["dy"], "dx": b["dx"]})
+	bullets = new_bullets
+	board_val = board_eval(board, botton_status)
+def move_enemy(enemy_speed):
+	global board, board_val, enemies
+	# Remove all enemies from board
+	for e in enemies:
+		y, x = e["y"], e["x"]
+		if 0 <= y < BOARD_HEIGHT and 0 <= x < BOARD_WIDTH:
+			if board[y][x] == "E":
+				board[y] = board[y][:x] + " " + board[y][x+1:]
+	# Move enemies
+	new_enemies = []
+	for e in enemies:
+		ny, nx = e["y"], e["x"] + enemy_speed
+		if 0 <= ny < BOARD_HEIGHT and 0 <= nx < BOARD_WIDTH:
+			if board_val[ny][nx] != "g" and not check_ground(board_val[ny][nx]):
+				board[ny] = board[ny][:nx] + "E" + board[ny][nx+1:]
+				new_enemies.append({"y": ny, "x": nx})
+	enemies = new_enemies
+	board_val = board_eval(board, botton_status)
+#def enemy_logic(dificulty):
+    
+def shoot(x,y,aim):
+	global board
+	global board_val
+	global upgrade
+	if aim==None:
+		aim("6")
+	global bullets
+	direction_map = {
+		"A": (0, 1),   # right
+		"B": (0, -1),  # left
+		"C": (-1, 0),  # up
+		"D": (1, 0),   # down
+		"E": (-1, 1),  # up-right
+		"F": (1, 1),   # down-right
+		"G": (-1, -1), # up-left
+		"H": (1, -1),  # down-left
+	}
+	if player_char in direction_map:
+		dy, dx = direction_map[player_char]
+		by, bx = y + dy, x + dx
+		if 0 <= by < BOARD_HEIGHT and 0 <= bx < BOARD_WIDTH:
+			if board_val[by][bx] != "g" and not check_ground(board_val[by][bx]):
+				board[by] = board[by][:bx] + "•" + board[by][bx+1:]
+				bullets.append({"y": by, "x": bx, "dy": dy, "dx": dx})
+				board_val = board_eval(board, botton_status)
 #needs to be worked on
+def spawn_enemy(spawn_x, spawn_y):
+	global board, board_val, enemies
+	if 0 <= spawn_y < BOARD_HEIGHT and 0 <= spawn_x < BOARD_WIDTH:
+		if board_val[spawn_y][spawn_x] != "g" and not check_ground(board_val[spawn_y][spawn_x]):
+			board[spawn_y] = board[spawn_y][:spawn_x] + "E" + board[spawn_y][spawn_x+1:]
+			enemies.append({"y": spawn_y, "x": spawn_x})
+			board_val = board_eval(board, botton_status)
 def check_ground(check_cord):
 	if check_cord  in ground_on:
 		return True
@@ -261,6 +342,7 @@ def print_buffer(buffer):
 		print("".join(line),end=nextline)
 
 def board_game_loop(playerx, playery):
+	global player_char
 	global debugging
 	"""Renders the game board with the player and handles boundary checks."""
 	visible_map_str, view_x_start, view_y_start = get_map_shown(playery, playerx)
@@ -271,7 +353,7 @@ def board_game_loop(playerx, playery):
 
 	# Ensure player position is within the buffer boundaries
 	if 0 <= local_playery < len(buffer) and 0 <= local_playerx < len(buffer[local_playery]):
-		buffer[local_playery][local_playerx] = "🯅"
+		buffer[local_playery][local_playerx] = player_char
 	print_buffer(buffer)
 	if debugging:
 		print(f"""botton_status:{botton_status}
@@ -298,6 +380,7 @@ tic=0
 reccored=False
 email_sent=False
 email_count=0
+cooldown=0
 # Main game loop
 while True:
 	tic+=1
@@ -320,10 +403,8 @@ while True:
 			# --- Handle Jump and Vertical Movement ---
 			if move == "f" and debugging:
 				vol+=.5
-			if (move == " " or move == "w") and on_ground:
+			if move == "w" and on_ground:
 				vol = .5
-			# handle players gun
-			#if move=="e":
 				
 			# Apply gravity
 			if vol > -2:
@@ -353,10 +434,16 @@ while True:
 				playerx = savex
 				playery = savey
 				vol = 0
+			if move == " " or move == "5" and cooldown==0:
+				cooldown=30
+				shoot(playerx,playery,player_aim)
+			
+			if cooldown>0:
+				cooldown-=1
 			if move == "a" and move_left:
 				next_x = max(0, playerx - 1)
-			if move=="a" or move=="4":
-				player_aim("left")
+			if move in ["1","2","3","4","5","6","7","8","9","0"]:
+				player_aim(move)
 			if move == "d" and move_right:
 				next_x = min(BOARD_WIDTH - 1, playerx + 1)
 			if board_val[playery][next_x] != "g" or not check_ground(board_val[playery][next_x]):
@@ -369,6 +456,7 @@ while True:
 					playerx=next_x
 
 			# --- Update Collision Flags ---
+			# Check if the player is on the ground
 			on_ground = playery + 1 < BOARD_HEIGHT and board_val[playery + 1][playerx] == "g" or check_ground(board_val[playery+1][playerx])
 
 			if playerx > 0:
@@ -386,6 +474,7 @@ while True:
 			board_game_loop(playerx, playery)
 			
 			# --- Check for Game Events ---
+			move_bullet()
 			curant_pos = board_val[playery][playerx]
 			if curant_pos.startswith("B") and curant_pos != curant_pos_prev:
 				count = int(curant_pos[1:])
