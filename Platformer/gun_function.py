@@ -166,10 +166,20 @@ BOARD_HEIGHT = len(board)
 BOARD_WIDTH = len(board[0])
 VIEW_HEIGHT=50
 VIEW_WIDTH=95
+upgrade=[False]
 button_on=["⑴","⑵","⑶","⑷","⑸","⑹","⑺","⑻","⑼","⑽","⑾","⑿","⒀","⒁","⒂","⒃","⒄","⒅","⒆","⒇"]
 ground_on=["➊","➋","➌","➍","➎","➏","➐","➑","➒","➓","⓫","⓬","⓭","⓮","⓯","⓰","⓱","⓲","⓳","⓴"]
 ground_off=["①","②","③","④","⑤","⑥","⑦","⑧","⑨","⑩","⑪","⑫","⑬","⑭","⑮","⑯","⑰","⑱","⑲","⑳"]
-
+def player_aim(direction):
+	global player_char
+	global upgrade
+	if direction=="8" and upgrade[0]==False:
+		player_char="E"
+	if direction=="9" and upgrade[0]==False:
+		player_char="C"
+	if direction=="7" and upgrade[0]==False:
+		player_char="D"
+#needs to be worked on
 def check_ground(check_cord):
 	if check_cord  in ground_on:
 		return True
@@ -345,6 +355,8 @@ while True:
 				vol = 0
 			if move == "a" and move_left:
 				next_x = max(0, playerx - 1)
+			if move=="a" or move=="4":
+				player_aim("left")
 			if move == "d" and move_right:
 				next_x = min(BOARD_WIDTH - 1, playerx + 1)
 			if board_val[playery][next_x] != "g" or not check_ground(board_val[playery][next_x]):
