@@ -153,7 +153,7 @@ board=[
 "                                                                                              █",
 "                                                                                              █",
 "                                                                                              █",
-"                                                                                              █",
+"                                                                         ♣                    █",
 "                                                                                              █",
 "                                                                                              █",
 "                                                                                              █",
@@ -171,6 +171,7 @@ upgrade=[False]
 button_on=["⑴","⑵","⑶","⑷","⑸","⑹","⑺","⑻","⑼","⑽","⑾","⑿","⒀","⒁","⒂","⒃","⒄","⒅","⒆","⒇"]
 ground_on=["➊","➋","➌","➍","➎","➏","➐","➑","➒","➓","⓫","⓬","⓭","⓮","⓯","⓰","⓱","⓲","⓳","⓴"]
 ground_off=["①","②","③","④","⑤","⑥","⑦","⑧","⑨","⑩","⑪","⑫","⑬","⑭","⑮","⑯","⑰","⑱","⑲","⑳"]
+
 def player_aim(direction):
 	global player_char
 	global upgrade
@@ -190,6 +191,52 @@ def player_aim(direction):
 		player_char="I"
 	if direction=="1" and upgrade[0]==False:
 		player_char="H"
+	if direction=="8" and upgrade[0]==True:
+		player_char="X"
+	if direction=="9" and upgrade[0]==True:
+		player_char="V"
+	if direction=="7" and upgrade[0]==True:
+		player_char="W"
+	if direction=="6" and upgrade[0]==True:
+		player_char="T"
+	if direction=="4" and upgrade[0]==True:
+		player_char="U"
+	if direction=="3" and upgrade[0]==True:
+		player_char="Z"
+	if direction=="2" and upgrade[0]==True:
+		player_char="b"
+	if direction=="1" and upgrade[0]==True:
+		player_char="a"
+enemies=[]
+enemy_location = {}
+enemy_dificulty=[]
+def check_enemy_atack():
+	global board, board_val, enemies, bullets, playerx, playery, invincible
+	# Check for bullet-enemy collisions
+	new_bullets = []
+	for b in bullets:
+		hit_enemy = False
+		for e in enemies:
+			if b["y"] == e["y"] and b["x"] == e["x"]:
+				hit_enemy = True
+				# Remove enemy from board
+				board[e["y"]] = board[e["y"]][:e["x"]] + " " + board[e["y"]][e["x"]+1:]
+				enemies.remove(e)
+				break
+		if not hit_enemy:
+			new_bullets.append(b)
+	bullets = new_bullets
+	
+	# Check for enemy-player collisions
+	for e in enemies:
+		if e["y"] == playery and e["x"] == playerx:
+			if not invincible:
+				print("You were hit by an enemy!")
+				time.sleep(0.5)
+				playerx = savex
+				playery = savey
+				invincible = True
+
 def move_bullet(direction=None):
 	global board, board_val, bullets
 	# Remove all bullets from board
@@ -208,26 +255,30 @@ def move_bullet(direction=None):
 				new_bullets.append({"y": ny, "x": nx, "dy": b["dy"], "dx": b["dx"]})
 	bullets = new_bullets
 	board_val = board_eval(board, botton_status)
-def move_enemy(enemy_speed):
-	global board, board_val, enemies
-	# Remove all enemies from board
-	for e in enemies:
-		y, x = e["y"], e["x"]
-		if 0 <= y < BOARD_HEIGHT and 0 <= x < BOARD_WIDTH:
-			if board[y][x] == "E":
-				board[y] = board[y][:x] + " " + board[y][x+1:]
-	# Move enemies
+def move_enemy():
+	global board
+	global board_val
+	global enemies
+	global playerx
+	global playery
 	new_enemies = []
-	for e in enemies:
-		ny, nx = e["y"], e["x"] + enemy_speed
-		if 0 <= ny < BOARD_HEIGHT and 0 <= nx < BOARD_WIDTH:
-			if board_val[ny][nx] != "g" and not check_ground(board_val[ny][nx]):
-				board[ny] = board[ny][:nx] + "E" + board[ny][nx+1:]
-				new_enemies.append({"y": ny, "x": nx})
+	for e,i in enumerate(enemies):
+		dy, dx = enemy_logic("easy")
+
+		new_enemies.append({"y": new_y, "x": new_x})
 	enemies = new_enemies
 	board_val = board_eval(board, botton_status)
-#def enemy_logic(dificulty):
-    
+	
+def enemy_logic(dificulty):
+	# Simple logic: move towards the player if on the same row or column
+	if dificulty=="easy":
+		return random.choice([(0, 1), (0, -1), (1, 0), (-1, 0), (0, 0)])  # right, left, down, up, stay
+	elif dificulty=="medium":
+		return random.choice([(0, 1), (0, -1), (1, 0), (-1, 0)])  # right, left, down, up
+	elif dificulty=="hard":
+		return (0, 1) if playerx > enemy_location["x"] else (-1, 0) if playerx < enemy_location["x"] else (1, 0) if playery > enemy_location["y"] else (0, -1) if playery < enemy_location["y"] else (0, 0)
+	else:
+		return (0, 0)  # Default to no movement
 def shoot(x,y,aim):
 	global board
 	global board_val
@@ -238,12 +289,13 @@ def shoot(x,y,aim):
 	direction_map = {
 		"A": (0, 1),   # right
 		"B": (0, -1),  # left
-		"C": (-1, 0),  # up
-		"D": (1, 0),   # down
-		"E": (-1, 1),  # up-right
+		"C": (-1, 1),   #up-right
+		"D": (-1, -1),  # up-left
+		"E": (-1, 0),  # up
 		"F": (1, 1),   # down-right
-		"G": (-1, -1), # up-left
+		"G": (1, 1), # up-left
 		"H": (1, -1),  # down-left
+		"I": (1, 0),  # down
 	}
 	if player_char in direction_map:
 		dy, dx = direction_map[player_char]
@@ -255,19 +307,79 @@ def shoot(x,y,aim):
 				board_val = board_eval(board, botton_status)
 #needs to be worked on
 def spawn_enemy(spawn_x, spawn_y):
-	global board, board_val, enemies
-	if 0 <= spawn_y < BOARD_HEIGHT and 0 <= spawn_x < BOARD_WIDTH:
-		if board_val[spawn_y][spawn_x] != "g" and not check_ground(board_val[spawn_y][spawn_x]):
-			board[spawn_y] = board[spawn_y][:spawn_x] + "E" + board[spawn_y][spawn_x+1:]
-			enemies.append({"y": spawn_y, "x": spawn_x})
-			board_val = board_eval(board, botton_status)
+	global board
+	global board_val
+	global enemies
+	if board[spawn_y][spawn_x] == " ":
+		board[spawn_y] = board[spawn_y][:spawn_x] + "E" + board[spawn_y][spawn_x+1:]
+		enemy_location = {"y": spawn_y, "x": spawn_x}
+		if enemy_location not in enemies:
+			enemies.append(enemy_location)
+		board_val = board_eval(board, botton_status)
 def check_ground(check_cord):
 	if check_cord  in ground_on:
 		return True
 	else:
 		return False
 ### this is where errors happen ###
+def spawn_boss(spawn_x, spawn_y,char):
+	global board
+	global board_val
+	global enemies
+	if board[spawn_y][spawn_x] == " ":
+		board[spawn_y] = board[spawn_y][:spawn_x] + char + board[spawn_y][spawn_x+1:]
+		enemy_location = {"y": spawn_y, "x": spawn_x}
+		if enemy_location not in enemies:
+			enemies.append(enemy_location)
+		board_val = board_eval(board, botton_status)
+boss_1_sprite=[
+"""         __        _      """,
+"""       _/  \    _(\(o     """,
+"""      /     \  /  _  ^^^o """,
+"""     _/  !   \/  ! '!!!v' """,
+"""    !  !  \ _' ( \____    """,
+"""    ! . \ _!\   \===^\)   """,
+"""     \ \_!  / __!         """,
+"""      \!   /    \         """,
+"""(\_      _/   _\ )        """,
+""" \ ^^--^^ __-^ /(__       """,
+"""  ^^----^^    "^--v'      """]
+boss_2_sprite=[
+"""          v  """,
+"""    (__)v | v""",
+"""    /\/\\_|_/""",
+"""   _\__/  |  """,
+"""  /  \/`\<`) """,
+"""  \ (  |\_/  """,
+"""  /)))-(  |  """,
+""" / /^ ^ \ |  """,
+"""/  )^/\^( |  """,
+""")_//`__>> |  """,
+"""  #   #`  |  """]
+boss_3_sprite=[
+"""    .-.    """,
+"""   (o.o)   """,
+"""    |=|    """,
+"""   __|__   """,
+""" //.=|=.\\ """,
+"""// .=|=. \\""",
+"""\\ .=|=. //""",
+""" \\(_=_)// """,
+"""  (:| |:)  """,
+"""   || ||   """,
+"""   () ()   """,
+"""   || ||   """,
+"""   || ||   """,
+"""  ==' '==  """]
+def print_bosses(x,y,char):
+	global board
+
+def boss_1_logic(playerx, playery, enemyx, enemyy, ):
+
+
 def board_eval(current_board, button_status):
+	global enemies
+	global enemy_location
 	"""Evaluates the board based on button status and returns the value grid."""
 	out2 = []
 	for y, row in enumerate(current_board):
@@ -281,6 +393,25 @@ def board_eval(current_board, button_status):
 				out1.append("s")
 			elif char == "⚐":
 				out1.append("w")
+			elif char == "♣":
+				spawn_enemy(x, y)
+				out1.append("d")
+				enemy_location = {"y": y, "x": x}
+				enemy_dificulty.append("easy")
+			elif char == "♠":
+				spawn_enemy(x, y)
+				out1.append("d")
+				enemy_location = {"y": y, "x": x}
+				enemy_dificulty.append("medium")
+			elif char == "♥":
+				spawn_enemy(x, y)
+				out1.append("d")
+				enemy_location = {"y": y, "x": x}
+				enemy_dificulty.append("hard")
+			elif char in ["♔","♕","♖","♗","♘","♙"]:
+				spawn_boss(x, y,char)
+				if enemy_location not in enemies:
+					enemies.append(enemy_location)
 			elif char in button_on:
 				count = button_on.index(char)
 				out1.append(f"B{count}")
@@ -295,9 +426,6 @@ def board_eval(current_board, button_status):
 					out1.append(" ")
 		out2.append(out1)
 	return out2
-### this is where errors happen ###
-def make_projectile(xoragin,yoragin,directon):
-
 
 
 board_val = board_eval(board, botton_status)
@@ -435,8 +563,8 @@ while True:
 				playerx = savex
 				playery = savey
 				vol = 0
-			if move == " " or move == "5" and cooldown==0:
-				cooldown=30
+			if move == "5" and cooldown==0:
+				cooldown=5
 				shoot(playerx,playery,player_aim)
 			
 			if cooldown>0:
@@ -477,6 +605,7 @@ while True:
 			# --- Check for Game Events ---
 			check_enemy_atack()
 			move_bullet()
+			move_enemy()
 			curant_pos = board_val[playery][playerx]
 			if curant_pos.startswith("B") and curant_pos != curant_pos_prev:
 				count = int(curant_pos[1:])
