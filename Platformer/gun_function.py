@@ -211,7 +211,7 @@ enemies=[]
 enemy_location = {}
 enemy_dificulty=[]
 def check_enemy_atack():
-	global board, board_val, enemies, bullets, playerx, playery, invincible
+	global board, board_val, enemies, bullets, playerx, playery
 	# Check for bullet-enemy collisions
 	new_bullets = []
 	for b in bullets:
@@ -262,23 +262,79 @@ def move_enemy():
 	global playerx
 	global playery
 	new_enemies = []
-	for e,i in enumerate(enemies):
-		dy, dx = enemy_logic("easy")
-
-		new_enemies.append({"y": new_y, "x": new_x})
-	enemies = new_enemies
-	board_val = board_eval(board, botton_status)
-	
-def enemy_logic(dificulty):
-	# Simple logic: move towards the player if on the same row or column
-	if dificulty=="easy":
-		return random.choice([(0, 1), (0, -1), (1, 0), (-1, 0), (0, 0)])  # right, left, down, up, stay
-	elif dificulty=="medium":
-		return random.choice([(0, 1), (0, -1), (1, 0), (-1, 0)])  # right, left, down, up
-	elif dificulty=="hard":
-		return (0, 1) if playerx > enemy_location["x"] else (-1, 0) if playerx < enemy_location["x"] else (1, 0) if playery > enemy_location["y"] else (0, -1) if playery < enemy_location["y"] else (0, 0)
+	for e in enemies:
+		ey, ex = e["y"], e["x"]
+		if 0 <= ey < BOARD_HEIGHT and 0 <= ex < BOARD_WIDTH:
+			if board[ey][ex] == "E":
+				board[ey] = board[ey][:ex] + " " + board[ey][ex+1:]
+		# Simple AI: Move towards the player if on the same row
+		if ey == playery:
+			if ex < playerx and ex + 1 < BOARD_WIDTH and board_val[ey][ex + 1] != "g" and not check_ground(board_val[ey][ex + 1]):
+				ex += 1
+			elif ex > playerx and ex - 1 >= 0 and board_val[ey][ex - 1] != "g" and not check_ground(board_val[ey][ex - 1]):
+				ex -= 1
+		# Add enemy back to board at new position
+		if 0 <= ey < BOARD_HEIGHT and 0 <= ex < BOARD_WIDTH:
+			if board[ey][ex] == " ":
+				board[ey] = board[ey][:ex] + "E" + board[ey][ex+1:]
+				new_enemies.append({"y": ey, "x": ex})
+enemy_vol=[]
+def jump_enemy(enemy_index):
+	global board
+	global board_val
+	global enemies
+	global enemy_vol
+	if 0 <= enemy_index < len(enemies):
+		e = enemies[enemy_index]
+		ey, ex = e["y"], e["x"]
+		if 0 <= ey < BOARD_HEIGHT and 0 <= ex < BOARD_WIDTH:
+			if board[ey][ex] == "E":
+				board[ey] = board[ey][:ex] + " " + board[ey][ex+1:]
+		# Jump logic
+		if ey > 0 and (board_val[ey - 1][ex] != "g" and not check_ground(board_val[ey - 1][ex])):
+			ey -= 1  # Move up
+			# Simulate gravity
+			while ey + 1 < BOARD_HEIGHT and (board_val[ey + 1][ex] != "g" and not check_ground(board_val[ey + 1][ex])):
+				ey += 1
+		# Add enemy back to board at new position
+		if 0 <= ey < BOARD_HEIGHT and 0 <= ex < BOARD_WIDTH:
+			if board[ey][ex] == " ":
+				board[ey] = board[ey][:ex] + "E" + board[ey][ex+1:]
+				enemies[enemy_index] = {"y": ey, "x": ex}
+def enemy_logic(dificulty,playerx,playery,enemy_x,enemy_y,enemy_vol):
+	shoot_chance = random.randint(1, 10)
+	if dificulty == "easy":
+		if shoot_chance > 8:
+			aim=logic_for_aiming(playerx,playery,enemy_x,enemy_y)
+			shoot(enemy_x, enemy_y, aim)
+			return (0, 0)  # No movement when shooting
+		else:
+			if enemy_x < playerx:
+				return (0, 1)  # Move right
+			elif enemy_x > playerx:
+				return (0, -1)  # Move left
+			elif enemy_y < playery:
+				jump_enemy(
+	elif dificulty == "medium":
+def logic_for_aiming(playerx,playery,enemy_x,enemy_y):
+	if playerx > enemy_x and playery == enemy_y:
+		return "A"  # right
+	elif playerx < enemy_x and playery == enemy_y:
+		return "B"  # left
+	elif playerx > enemy_x and playery < enemy_y:
+		return "C"  # up-right
+	elif playerx < enemy_x and playery < enemy_y:
+		return "D"  # up-left
+	elif playerx == enemy_x and playery < enemy_y:
+		return "E"  # up
+	elif playerx > enemy_x and playery > enemy_y:
+		return "F"  # down-right
+	elif playerx < enemy_x and playery > enemy_y:
+		return "G"  # down-left
+	elif playerx == enemy_x and playery > enemy_y:
+		return "I"  # down
 	else:
-		return (0, 0)  # Default to no movement
+		return None  # No valid direction
 def shoot(x,y,aim):
 	global board
 	global board_val
@@ -332,7 +388,7 @@ def spawn_boss(spawn_x, spawn_y,char):
 		if enemy_location not in enemies:
 			enemies.append(enemy_location)
 		board_val = board_eval(board, botton_status)
-boss_1_sprite=[
+boss_1_sprite_idle=[[
 """         __        _      """,
 """       _/  \    _(\(o     """,
 """      /     \  /  _  ^^^o """,
@@ -343,8 +399,136 @@ boss_1_sprite=[
 """      \!   /    \         """,
 """(\_      _/   _\ )        """,
 """ \ ^^--^^ __-^ /(__       """,
-"""  ^^----^^    "^--v'      """]
-boss_2_sprite=[
+"""  ^^----^^    "^--v'      """],
+["""         __        _      """,
+"""       _/  \    _(\(o	 """,
+"""      /     \  /  _  ^^^o """,
+"""     _/  !   \/  ! '!!!v' """,
+"""    !  !  \ _' ( \____    """,
+"""    ! . \ _!\   \===^\)   """,
+"""     \ \_!  / __!         """,
+"""      \!   /    \         """,
+"""  ^      _/   _\ )        """,
+"""  \^^--^^ __-^ /(__       """,
+"""   ^----^^    "^--v'      """],
+["""         __        _      """,
+"""       _/  \    _(\(o     """,
+"""      /     \  /  _  ^^^o """,
+"""     _/  !   \/  ! '!!!v' """,
+"""    !  !  \ _' ( \____    """,
+"""    ! . \ _!\   \===^\)   """,
+"""     \ \_!  / __!         """,
+"""      \!   /    \         """,
+"""(\_      _/   _\ )        """,
+""" \ ^^--^^ __-^ /(__       """,
+"""  ^^----^^    "^--v'      """],
+["""         __        _      """,
+"""       _/  \    _(\(o     """,
+"""      /     \  /  _  ^^^o """,
+"""     _/  !   \/  ! '!!!v' """,
+"""    !  !  \ _' ( \____    """,
+"""    ! . \ _!\   \===^\)   """,
+""" /\ \ \_!  / __!          """,
+"""|  | \!   /    \          """,
+"""\  \   _/   _\ )          """,
+""" \ ^^--^^ __-^ /(__       """,
+"""  ^^----^^    "^--v'      """],
+]
+boss_1_sprite_atack_single=[[
+"""         __        _      """,
+"""       _/  \    _(\(o     """,
+"""      /     \  /  _  ^^^o """,
+"""     _/  !   \/  ! '!!!v' """,
+"""    !  !  \ _' ( \____    """,
+"""    ! . \ _!\   \===^\)   """,
+"""     \ \_!  / __!         """,
+"""      \!   /    \         """,
+"""(\_      _/   _\ )        """,
+""" \ ^^--^^ __-^ /(__       """,
+"""  ^^----^^    "^--v'      """],
+["""      __        _         """,
+"""     _/  \    _(\(o___    """,
+"""    /     \  /  _ /^^^o   """,
+"""   _/  !   \/  ! '\vvv    """,
+"""  !  !  \ _' ( \____      """,
+"""  ! . \ _!\   \===^\)     """,
+"""   \ \_!  \ __\           """,
+"""      \!   /    \         """,
+"""(\_      _/   _\ )        """,
+""" \ ^^--^^ __-^ /(__       """,
+"""  ^^----^^    "^--v'      """],
+["""         __        _      """,
+"""       _/  \    _(\(o___  """,
+"""      /     \  /  _/^^^o  """,
+"""     _/  !   \/  ! \vvvv' """,
+"""    !  !  \ _' ( \____    """,
+"""    ! . \ _!\   \===^\)   """,
+"""     \ \_!  / __!         """,
+"""      \!   /    \         """,
+"""(\_      _/   _\ )        """,
+""" \ ^^--^^ __-^ /(__       """,
+"""  ^^----^^    "^--v'      """],
+["""         __        _      """,
+"""       _/  \    _(\(o     """,
+"""      /     \  /  _  ^^^o """,
+"""     _/  !   \/  ! '!!!v' """,
+"""    !  !  \ _' ( \____    """,
+"""    ! . \ _!\   \===^\)   """,
+"""     \ \_!  / __!         """,
+"""      \!   /    \         """,
+"""(\_      _/   _\ )        """,
+""" \ ^^--^^ __-^ /(__       """,
+"""  ^^----^^    "^--v'      """],
+]
+boss_atack_spray=[[
+"""         __        _      """,
+"""       _/  \    _(\(o     """,
+"""      /     \  /  _  ^^^o """,
+"""     _/  !   \/  ! '!!!v' """,
+"""    !  !  \ _' ( \____    """,
+"""    ! . \ _!\   \===^\)   """,
+"""     \ \_!  / __!         """,
+"""      \!   /    \         """,
+"""(\_      _/   _\ )        """,
+""" \ ^^--^^ __-^ /(__       """,
+"""  ^^----^^    "^--v'      """],
+[
+"""         __        _      """,
+"""       _/  \    _(\(o     """,
+"""      /     \  /  _  ^^^o """,
+"""     _/  !   \/  ! '!!!v' """,
+"""    !  !  \ _' (     /-^  """,
+"""    ! . \ _!\   \====-^   """,
+"""     \ \_!  / __!         """,
+"""      \!   /    \         """,
+"""(\_      _/   _\ )        """,
+""" \ ^^--^^ __-^ /(__       """,
+"""  ^^----^^    "^--v'      """],
+[
+"""         __        _      """,
+"""       _/  \    _(\(o     """,
+"""      /     \  /  _  ^^^o """,
+"""     _/  !   \/  ! '!!!v' """,
+"""    !  !  \ _' ( \____    """,
+"""    ! . \ _!\   \===^\)   """,
+"""     \ \_!  / __!         """,
+"""      \!   /    \         """,
+"""(\_      _/   _\ )        """,
+""" \ ^^--^^ __-^ /(__       """,
+"""  ^^----^^    "^--v'      """],
+[
+"""         __        _      """,
+"""       _/  \    _(\(o     """,
+"""      /     \  /  _  ^^^o """,
+"""     _/  !   \/  ! '!!!v' """,
+"""    !  !  \ _' ( \_       """,
+"""    ! . \ _!\   \===-^    """,
+"""     \ \_!  / __!  \^     """,
+"""      \!   /    \         """,
+"""(\_      _/   _\ )        """,
+""" \ ^^--^^ __-^ /(__       """,
+"""  ^^----^^    "^--v'      """]]
+boss_2_sprite_idle=[[
 """          v  """,
 """    (__)v | v""",
 """    /\/\\_|_/""",
@@ -355,10 +539,95 @@ boss_2_sprite=[
 """ / /^ ^ \ |  """,
 """/  )^/\^( |  """,
 """)_//`__>> |  """,
-"""  #   #`  |  """]
-boss_3_sprite=[
+"""  #   #`  |  """],
+[
+"""          v  """,
+"""    (__)v | v""",
+"""    /\/\\_|_/""",
+"""   _\__/  |  """,
+"""  /  \/`\<`) """,
+"""  \ (  |\_/  """,
+"""  7)))-(  |  """,
+""" ( /^ ^ \ |  """,
+"""%  )^/\^( |  """,
+""")_//`__>> |  """,
+"""  #   #`  |  """],
+[
+"""          v  """,
+"""    (__)v | v""",
+"""    /\/\\_|_/""",
+"""   _\__/  |  """,
+"""  /  \/`\<`) """,
+"""  \ (  |\_/  """,
+"""  /)))-(  |  """,
+""" / /^ ^ \ |  """,
+"""/  )^/\^( |  """,
+""")_//`__>> |  """,
+"""  #   #`  |  """],
+[
+"""          v  """,
+"""    (__)v | v""",
+"""    /\/\\_|_/""",
+"""   _\__/  |  """,
+"""  /  \/`\<`) """,
+"""  \ (  |\_/  """,
+"""  |)))-(  |  """,
+"""  //^ ^ \ |  """,
+""" < )^/\^( |  """,
+""")_//`__>> |  """,
+"""  #   #`  |  """],]
+boss_2_sprite_atack_spray=[[
+"""          v  """,
+"""    (__)v | v""",
+"""    /\/\\_|_/""",
+"""   _\__/  |  """,
+"""  /  \/`\<`) """,
+"""  \ (  |\_/  """,
+"""  /)))-(  |  """,
+""" / /^ ^ \ |  """,
+"""/  )^/\^( |  """,
+""")_//`__>> |  """,
+"""  #   #`  |  """],[
+"""		     v  """,
+"""        v | v""",
+"""    (__)\_|_/""",
+"""    /\/\  |  """,
+"""   _\__/  |  """,
+"""  /  \/`\<`) """,
+"""  \ (  |\_/  """,
+"""  /)))-(  |  """,
+""" / /^ ^ \ |  """,
+"""/  )^/\^( |  """,
+""")_//`__>> |  """,
+"""  #   #`  v  """],[
+"""          v  """,
+"""		   v | v""",
+"""        \_|_/  """,
+"""    (__)  |  """,
+"""    /\/\  |  """,
+"""   _\__/  |  """,
+"""  /  \/`\<`) """,
+"""  \ (  |\_/  """,
+"""  /)))-(  |  """,
+""" / /^ ^ \ |  """,
+"""/  )^/\^( |  """,
+""")_//`__>> v  """,
+"""  #   #`     """],[
+"""          v  """,
+"""    (__)v | v""",
+"""    /\/\\_|_/""",
+"""   _\__/  |  """,
+"""  /  \/`\<`) """,
+"""  \ (  |\_/  """,
+"""  /)))-(  |  """,
+""" / /^ ^ \ |  """,
+"""/  )^/\^( |  """,
+""")_//`__>> |  """,
+"""  #   #`  |  """]]
+boss_2_sprite_single_atack=boss_2_sprite_atack_spray
+boss_3_sprite=[[
 """    .-.    """,
-"""   (o.o)   """,
+"""   (0.o)   """,
 """    |=|    """,
 """   __|__   """,
 """ //.=|=.\\ """,
@@ -370,12 +639,248 @@ boss_3_sprite=[
 """   () ()   """,
 """   || ||   """,
 """   || ||   """,
-"""  ==' '==  """]
+"""  ==' '==  """],[
+"""           """,
+"""    .-.    """,
+"""   (o.0)   """,
+"""   _|=|_   """,
+""" //.=|=.\\ """,
+"""// .=|=. \\""",
+"""\\ .=|=. //""",
+""" \\(_=_)// """,
+"""  (:| |:)  """,
+"""   || ||   """,
+"""   () ()   """,
+"""   || ||   """,
+"""   || ||   """,
+"""  ==' '==  """],[
+"""    .-.    """,
+"""   (0.o)   """,
+"""    |=|    """,
+"""   __|__   """,
+""" //.=|=.\\ """,
+"""// .=|=. \\""",
+"""\\ .=|=. //""",
+""" \\(_=_)// """,
+"""  (:| |:)  """,
+"""   || ||   """,
+"""   () ()   """,
+"""   || ||   """,
+"""   || ||   """,
+"""  ==' '==  """],[
+"""           """,
+"""    .-.    """,
+"""   (o.0)   """,
+"""   _|=|_   """,
+""" //.=|=.\\ """,
+"""// .=|=. \\""",
+"""\\ .=|=. //""",
+""" \\(_=_)// """,
+"""  (:| |:)  """,
+"""   || ||   """,
+"""   () ()   """,
+"""   || ||   """,
+"""   || ||   """,
+"""  ==' '==  """],]
+boss_3_sprite_atack_spray=[[
+"""    .-.    """,
+"""   (0.o)   """,
+"""    |=|    """,
+"""   __|__   """,
+""" //.=|=.\\ """,
+"""// .=|=. \\""",
+"""\\ .=|=. //""",
+""" \\(_=_)// """,
+"""  (:| |:)  """,
+"""   || ||   """,
+"""   () ()   """,
+"""   || ||   """,
+"""   || ||   """,
+"""  ==' '==  """],[
+"""    .-.         """,
+"""   (o.0)        """,
+"""    |=|         """,
+"""   __|__        """,
+""" //.=|=.=\\     """,
+"""// .=|=.  \\    """,
+"""\\ .=|=.  //    """,
+""" \\(_=_)  )     """,
+"""  (:| |:        """,
+"""   || ||        """,
+"""   () ()        """,
+"""   || ||        """,
+"""   || ||        """,
+"""  ==' '==       """],[
+"""    .-.         """,
+"""   (0.o)        """,
+"""    |=|     (    """,
+"""   __|__   //   """,
+""" //.=|=.==//    """,
+"""// .=|=.        """,
+"""\\ .=|=.        """,
+""" \\(_=_)        """,
+"""  (:| |:        """,
+"""   || ||        """,
+"""   () ()        """,
+"""   || ||        """,
+"""   || ||        """,
+"""  ==' '==       """],[
+"""    .-.    """,
+"""   (o.0)   """,
+"""    |=|    """,
+"""   __|__   """,
+""" //.=|=.\\ """,
+"""// .=|=. \\""",
+"""\\ .=|=. //""",
+""" \\(_=_)// """,
+"""  (:| |:)  """,
+"""   || ||   """,
+"""   () ()   """,
+"""   || ||   """,
+"""   || ||   """,
+"""  ==' '==  """],]
+boss_3_sprite_atack_single=[[
+"""    .-.    """,
+"""   (0.o)   """,
+"""    |=|    """,
+"""   __|__   """,
+""" //.=|=.\\ """,
+"""// .=|=. \\""",
+"""\\ .=|=. //""",
+""" \\(_=_)// """,
+"""  (:| |:)  """,
+"""   || ||   """,
+"""   () ()   """,
+"""   || ||   """,
+"""   || ||   """,
+"""  ==' '==  """],[
+"""          .-.       """,
+"""         (o.0)      """,
+"""          |=|       """,
+"""         __|__      """,
+"""       //.=|=//     """,
+"""      // .=|//      """,
+"""     //  .=#=.      """,
+"""    //   ===_)      """,
+"""    (   ):| |:      """,
+"""         || ||      """,
+"""         () ()      """,
+"""         || ||      """,
+"""         || ||      """,
+"""        ==' '==     """],[
+"""          .-.       """,
+"""         (o.0)      """,
+"""          |=|       """,
+"""         __|__      """,
+"""       //.=|=//     """,
+"""      // .=|//      """,
+"""     //  .=#=.      """,
+"""    //_  ===_)      """,
+"""    (|_|):| |:      """,
+"""         || ||      """,
+"""         () ()      """,
+"""         || ||      """,
+"""         || ||      """,
+"""        ==' '==     """],[
+"""          .-.            """,
+"""         (o.0)           """,
+"""          |=|            """,
+"""         __|__           """,
+"""       //.=|=.\\         """,
+"""      // .=|=. \\        """,
+"""      \\ .=|=. //        """,
+"""       \\(_=_)//         """,
+"""        (:| |:)          """,
+"""         || ||           """,
+"""         () ()           """,
+"""         || ||           """,
+"""         || ||           """,
+"""        ==' '==          """],]
 def print_bosses(x,y,char):
 	global board
-
-def boss_1_logic(playerx, playery, enemyx, enemyy, ):
-
+def print_bosses(x,y,char,frame,atack_type):
+	global board
+	if char=="♔":
+		if atack_type=="idle":
+			sprite=boss_1_sprite_idle[frame]
+		elif atack_type=="single":
+			sprite=boss_1_sprite_atack_single[frame]
+		elif atack_type=="spray":
+			sprite=boss_atack_spray[frame]
+		for i, line in enumerate(sprite):
+			if 0 <= y + i < BOARD_HEIGHT:
+				line_to_modify = board[y + i]
+				new_line = (line_to_modify[:x] + line + line_to_modify[x + len(line):])[:BOARD_WIDTH]
+				board[y + i] = new_line
+	elif char=="♕":
+		if atack_type=="idle":
+			sprite=boss_2_sprite_idle[frame]
+		elif atack_type=="single":
+			sprite=boss_2_sprite_single_atack[frame]
+		elif atack_type=="spray":
+			sprite=boss_2_sprite_atack_spray[frame]
+		for i, line in enumerate(sprite):
+			if 0 <= y + i < BOARD_HEIGHT:
+				line_to_modify = board[y + i]
+				new_line = (line_to_modify[:x] + line + line_to_modify[x + len(line):])[:BOARD_WIDTH]
+				board[y + i] = new_line
+	elif char=="♖":
+		if atack_type=="idle":
+			sprite=boss_3_sprite[frame]
+		elif atack_type=="single":
+			sprite=boss_3_sprite_atack_single[frame]
+		elif atack_type=="spray":
+			sprite=boss_3_sprite_atack_spray[frame]
+		for i, line in enumerate(sprite):
+			if 0 <= y + i < BOARD_HEIGHT:
+				line_to_modify = board[y + i]
+				new_line = (line_to_modify[:x] + line + line_to_modify[x + len(line):])[:BOARD_WIDTH]
+				board[y + i] = new_line
+def boss_atack(type,x,y,char):
+	global board
+	if type=="spray":
+		if char=="♔":
+			for i in range(-1,2):
+				if 0 <= y < BOARD_HEIGHT and 0 <= x+i < BOARD_WIDTH:
+					board[y] = board[y][:x+i] + "•" + board[y][x+i+1:]
+		elif char=="♕":
+			for i in range(-1,2):
+				if 0 <= y < BOARD_HEIGHT and 0 <= x+i < BOARD_WIDTH:
+					board[y] = board[y][:x+i] + "•" + board[y][x+i+1:]
+		elif char=="♖":
+			for i in range(-1,2):
+				if 0 <= y < BOARD_HEIGHT and 0 <= x+i < BOARD_WIDTH:
+					board[y] = board[y][:x+i] + "•" + board[y][x+i+1:]
+	if type=="single":
+		if char=="♔":
+			if 0 <= y < BOARD_HEIGHT and 0 <= x < BOARD_WIDTH:
+				board[y] = board[y][:x] + "•" + board[y][x+1:]
+		elif char=="♕":
+			if 0 <= y < BOARD_HEIGHT and 0 <= x < BOARD_WIDTH:
+				board[y] = board[y][:x] + "•" + board[y][x+1:]
+		elif char=="♖":
+			if 0 <= y < BOARD_HEIGHT and 0 <= x < BOARD_WIDTH:
+				board[y] = board[y][:x] + "•" + board[y][x+1:]
+	if type=="slam":
+		if char=="♔":
+			for i in range(-1,2):
+				if 0 <= y+i < BOARD_HEIGHT and 0 <= x < BOARD_WIDTH:
+					board[y+i] = board[y+i][:x] + "•" + board[y+i][x+1:]
+		elif char=="♕":
+			for i in range(-1,2):
+				if 0 <= y+i < BOARD_HEIGHT and 0 <= x < BOARD_WIDTH:
+					board[y+i] = board[y+i][:x] + "•" + board[y+i][x+1:]
+		elif char=="♖":	
+			for i in range(-1,2):
+				if 0 <= y+i < BOARD_HEIGHT and 0 <= x < BOARD_WIDTH:
+					board[y+i] = board[y+i][:x] + "•" + board[y+i][x+1:]
+def boss_1_logic(playerx, playery, enemyx, enemyy, boss_room_x1, boss_room_x2, boss_room_y1,bossroom_y2):
+	if playerx < boss_room_x1 or playerx > boss_room_x2 or playery < boss_room_y1 or playery > bossroom_y2:
+		return (0, 0)  # Stay still if the player is outside the boss room
+	dy = 1 if playery > enemyy else -1 if playery < enemyy else 0
+	dx = 1 if playerx > enemyx else -1 if playerx < enemyx else 0
+	return (dy, dx)
+	
 
 def board_eval(current_board, button_status):
 	global enemies
@@ -603,9 +1108,9 @@ while True:
 			board_game_loop(playerx, playery)
 			
 			# --- Check for Game Events ---
-			check_enemy_atack()
 			move_bullet()
 			move_enemy()
+			check_enemy_atack()
 			curant_pos = board_val[playery][playerx]
 			if curant_pos.startswith("B") and curant_pos != curant_pos_prev:
 				count = int(curant_pos[1:])
