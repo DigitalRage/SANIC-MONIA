@@ -971,18 +971,17 @@ while True:
 			if vol != 0:
 				step_direction = -1 if vol > 0 else 1
 				
-				for _ in range(int(abs(vol * 2)) + 1): # A bit more granular check
-					next_y = playery + step_direction
-					
-					if next_y < 0 or next_y >= BOARD_HEIGHT or board_val[next_y][playerx] == "g" or check_ground(board_val[next_y][playerx]):
-						if step_direction > 0:
-							on_ground = True
+				for i in range(int(abs(vol * 2)) + 1): # A bit more granular check
+					next_y = playery + step_direction * (i / 2)
+					if 0 <= next_y < BOARD_HEIGHT:
+						if board_val[int(next_y)][playerx] == "g" or check_ground(board_val[int(next_y)][playerx]):
 							vol = 0
-						vol = 0
-						ycheck=False
-						break
-					else:
-						ycheck=True
+							break
+			next_y = playery
+			if vol > 0:
+				next_y = max(0, playery - 1)
+			elif vol < 0:
+				next_y = min(BOARD_HEIGHT - 1, playery + 1)
 
 			# --- Handle Horizontal Movement ---
 			next_x = playerx
