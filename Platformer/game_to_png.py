@@ -46,6 +46,11 @@ class goround_tiles:
     
     
     """
+	button = """    
+    
+ 🟥🟥 
+⬛⬛⬛⬛"""
+
 class sprites:
 	player_up_faceing_left = """🟥🟥🟥🟥
 	🟥🟦🟦🟥
@@ -252,7 +257,7 @@ def convert_board_char(char):
 		return goround_tiles.grass
 	elif char == "~":
 		return goround_tiles.water
-	elif char == "^":
+	elif char in ["◀", "▼", "▶", "▲"]:
 		return goround_tiles.spike
 board_to_image(board,50,"test_board.png")
 monster = {

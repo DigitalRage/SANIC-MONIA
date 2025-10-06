@@ -2,7 +2,7 @@ import threading
 import time
 import random
 import os
-
+import game_to_png
 import sys
 import termios
 import tty
@@ -839,84 +839,6 @@ def spawn_big_projectile(x,y,sprite,direction):
 				line_to_modify = board[y + i]
 				new_line = (line_to_modify[:x] + " " * len(line) + line_to_modify[x + len(line):])[:BOARD_WIDTH]
 				board[y + i] = new_line
-def print_bosses(x,y,char):
-	global board
-def print_bosses(x,y,char,frame,atack_type):
-	global board
-	if char=="♔":
-		if atack_type=="idle":
-			sprite=boss_1_sprite_idle[frame]
-		elif atack_type=="single":
-			sprite=boss_1_sprite_atack_single[frame]
-		elif atack_type=="spray":
-			sprite=boss_atack_spray[frame]
-		for i, line in enumerate(sprite):
-			if 0 <= y + i < BOARD_HEIGHT:
-				line_to_modify = board[y + i]
-				new_line = (line_to_modify[:x] + line + line_to_modify[x + len(line):])[:BOARD_WIDTH]
-				board[y + i] = new_line
-	elif char=="♕":
-		if atack_type=="idle":
-			sprite=boss_2_sprite_idle[frame]
-		elif atack_type=="single":
-			sprite=boss_2_sprite_single_atack[frame]
-		elif atack_type=="spray":
-			sprite=boss_2_sprite_atack_spray[frame]
-		for i, line in enumerate(sprite):
-			if 0 <= y + i < BOARD_HEIGHT:
-				line_to_modify = board[y + i]
-				new_line = (line_to_modify[:x] + line + line_to_modify[x + len(line):])[:BOARD_WIDTH]
-				board[y + i] = new_line
-	elif char=="♖":
-		if atack_type=="idle":
-			sprite=boss_3_sprite[frame]
-		elif atack_type=="single":
-			sprite=boss_3_sprite_atack_single[frame]
-		elif atack_type=="spray":
-			sprite=boss_3_sprite_atack_spray[frame]
-		for i, line in enumerate(sprite):
-			if 0 <= y + i < BOARD_HEIGHT:
-				line_to_modify = board[y + i]
-				new_line = (line_to_modify[:x] + line + line_to_modify[x + len(line):])[:BOARD_WIDTH]
-				board[y + i] = new_line
-def boss_atack(type,x,y,char):
-	global board
-	if type=="spray":
-		if char=="♔":
-			for i in range(-1,2):
-				if 0 <= y < BOARD_HEIGHT and 0 <= x+i < BOARD_WIDTH:
-					board[y] = board[y][:x+i] + "•" + board[y][x+i+1:]
-		elif char=="♕":
-			for i in range(-1,2):
-				if 0 <= y < BOARD_HEIGHT and 0 <= x+i < BOARD_WIDTH:
-					board[y] = board[y][:x+i] + "•" + board[y][x+i+1:]
-		elif char=="♖":
-			for i in range(-1,2):
-				if 0 <= y < BOARD_HEIGHT and 0 <= x+i < BOARD_WIDTH:
-					board[y] = board[y][:x+i] + "•" + board[y][x+i+1:]
-	if type=="single":
-		if char=="♔":
-			if 0 <= y < BOARD_HEIGHT and 0 <= x < BOARD_WIDTH:
-				board[y] = board[y][:x] + "•" + board[y][x+1:]
-		elif char=="♕":
-			if 0 <= y < BOARD_HEIGHT and 0 <= x < BOARD_WIDTH:
-				board[y] = board[y][:x] + "•" + board[y][x+1:]
-		elif char=="♖":
-			if 0 <= y < BOARD_HEIGHT and 0 <= x < BOARD_WIDTH:
-				board[y] = board[y][:x] + "•" + board[y][x+1:]
-	if type=="slam":
-		if char=="♕":
-			for i in range(-1,2):
-				if 0 <= y+i < BOARD_HEIGHT and 0 <= x < BOARD_WIDTH:
-					board[y+i] = board[y+i][:x] + "•" + board[y+i][x+1:]
-def boss_1_logic(playerx, playery, enemyx, enemyy, boss_room_x1, boss_room_x2, boss_room_y1,bossroom_y2):
-	if playerx < boss_room_x1 or playerx > boss_room_x2 or playery < boss_room_y1 or playery > bossroom_y2:
-		return (0, 0)  # Stay still if the player is outside the boss room
-	dy = 1 if playery > enemyy else -1 if playery < enemyy else 0
-	dx = 1 if playerx > enemyx else -1 if playerx < enemyx else 0
-	return (dy, dx)
-	
-
 def board_eval(current_board, button_status):
 	global enemies
 	global enemy_location
@@ -933,37 +855,6 @@ def board_eval(current_board, button_status):
 				out1.append("s")
 			elif char == "⚐":
 				out1.append("w")
-			elif char == "♣":
-				spawn_enemy(x, y)
-				out1.append("d")
-				enemy_location = {"y": y, "x": x}
-				enemy_dificulty.append("easy")
-			elif char == "♠":
-				spawn_enemy(x, y)
-				out1.append("d")
-				enemy_location = {"y": y, "x": x}
-				enemy_dificulty.append("medium")
-			elif char == "♥":
-				spawn_enemy(x, y)
-				out1.append("d")
-				enemy_location = {"y": y, "x": x}
-				enemy_dificulty.append("hard")
-			elif char in ["♔","♕","♖","♗","♘","♙"]:
-				spawn_boss(x, y,char)
-				if enemy_location not in enemies:
-					enemies.append(enemy_location)
-			elif char in button_on:
-				count = button_on.index(char)
-				out1.append(f"B{count}")
-			else:
-				is_ground = False
-				for count, g_on_char in enumerate(ground_on):
-					if char == g_on_char and button_status[count]:
-						out1.append("g")
-						is_ground = True
-						break
-				if not is_ground:
-					out1.append(" ")
 		out2.append(out1)
 	return out2
 
@@ -1001,14 +892,11 @@ def get_map_shown(playery, playerx):
 
 
 def print_buffer(buffer):
-	"""Prints the buffer content to the console."""
-	os.system('cls' if os.name == 'nt' else 'clear')
-	collom,row=os.get_terminal_size()
-	nextline=""
-	for x in range(0,collom-BOARD_WIDTH):
-		nextline=nextline+" "
+	"""outputs the game board to a png file useing the game_to_png file"""
 	for line in buffer:
-		print("".join(line),end=nextline)
+		print("".join(line))
+	if not pause:
+		game_to_png.convert_board_char(buffer, 'game_output.png')
 
 def board_game_loop(playerx, playery):
 	global player_char
