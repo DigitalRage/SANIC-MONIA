@@ -31,6 +31,7 @@ def get_color(char):
 		return colors[compare_chars.index(char)]
 #the sprites are going to be 20x20 pixels
 #plater is going to be 20x20 pixels but only use 20x10 pixels
+#curently the tiles are 4x4 pixels for texting purposes
 class goround_tiles:
 	grass = """🟩🟩🟩🟩
 🟩🟩🟩🟩
