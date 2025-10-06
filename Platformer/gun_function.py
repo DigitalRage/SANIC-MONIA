@@ -8,7 +8,6 @@ import termios
 import tty
 import threading
 import queue
-import time
 import smtplib
 
 # Event to signal the input thread to stop
@@ -161,7 +160,7 @@ board=[
 "███████████████████████████████████████████████████████████████████████████████████████████████",
 "███████████████████████████████████████████████████████████████████████████████████████████████"]
 player_char="A"
-BOARD_SAVE=board
+BOARD_SAVE = list(board)
 bullets=[]
 BOARD_HEIGHT = len(board)
 BOARD_WIDTH = len(board[0])
@@ -211,7 +210,7 @@ enemies=[]
 enemy_location = {}
 enemy_dificulty=[]
 def check_enemy_atack():
-	global board, board_val, enemies, bullets, playerx, playery
+	global board, board_val, enemies, bullets, playerx, playery, invincible
 	# Check for bullet-enemy collisions
 	new_bullets = []
 	for b in bullets:
@@ -302,6 +301,9 @@ def jump_enemy(enemy_index):
 				board[ey] = board[ey][:ex] + "E" + board[ey][ex+1:]
 				enemies[enemy_index] = {"y": ey, "x": ex}
 def enemy_logic(dificulty,playerx,playery,enemy_x,enemy_y,enemy_vol):
+	global board
+	global board_val
+	global enemies
 	shoot_chance = random.randint(1, 10)
 	if dificulty == "easy":
 		if shoot_chance > 8:
@@ -314,8 +316,19 @@ def enemy_logic(dificulty,playerx,playery,enemy_x,enemy_y,enemy_vol):
 			elif enemy_x > playerx:
 				return (0, -1)  # Move left
 			elif enemy_y < playery:
-				jump_enemy(
+				jump_enemy(enemys.index({"y": enemy_y, "x": enemy_x}))
 	elif dificulty == "medium":
+		if shoot_chance > 6:
+			aim=logic_for_aiming(playerx,playery,enemy_x,enemy_y)
+			shoot(enemy_x, enemy_y, aim)
+			return (0, 0)  # No movement when shooting
+		else:
+			if enemy_x < playerx:
+				return (0, 1)  # Move right
+			elif enemy_x > playerx:
+				return (0, -1)  # Move left
+			elif enemy_y < playery:
+				jump_enemy(enemys.index({"y": enemy_y, "x": enemy_x}))
 def logic_for_aiming(playerx,playery,enemy_x,enemy_y):
 	if playerx > enemy_x and playery == enemy_y:
 		return "A"  # right
@@ -340,7 +353,7 @@ def shoot(x,y,aim):
 	global board_val
 	global upgrade
 	if aim==None:
-		aim("6")
+		aim = "6"
 	global bullets
 	direction_map = {
 		"A": (0, 1),   # right
@@ -786,16 +799,46 @@ boss_3_sprite_atack_single=[[
 """         (o.0)           """,
 """          |=|            """,
 """         __|__           """,
-"""       //.=|=.\\         """,
-"""      // .=|=. \\        """,
-"""      \\ .=|=. //        """,
-"""       \\(_=_)//         """,
-"""        (:| |:)          """,
+"""         \\|=.\\         """,
+"""         .\\=.  \\       """,
+"""         .=|===n  ==n    """,
+"""         (_=_)           """,
+"""         :| |:           """,
 """         || ||           """,
 """         () ()           """,
 """         || ||           """,
 """         || ||           """,
 """        ==' '==          """],]
+def spawn_big_projectile(x,y,sprite,direction):
+	global board
+	for i, line in enumerate(sprite):
+		if 0 <= y + i < BOARD_HEIGHT:
+			line_to_modify = board[y + i]
+			end_index = min(x + len(line), len(line_to_modify))
+			new_line = (line_to_modify[:x] + line + line_to_modify[end_index:])[:BOARD_WIDTH]
+			board[y + i] = new_line
+	while True:
+		time.sleep(0.1)
+		if direction=="down":
+			y+=1
+		elif direction=="up":
+			y-=1
+		elif direction=="left":
+			x-=1
+		elif direction=="right":
+			x+=1
+		for i, line in enumerate(sprite):
+			if 0 <= y + i < BOARD_HEIGHT:
+				line_to_modify = board[y + i]
+				new_line = (line_to_modify[:x] + line + line_to_modify[x + len(line):])[:BOARD_WIDTH]
+				board[y + i] = new_line
+		if y<0 or y>=BOARD_HEIGHT or x<0 or x>=BOARD_WIDTH:
+			break
+		for i, line in enumerate(sprite):
+			if 0 <= y + i < BOARD_HEIGHT:
+				line_to_modify = board[y + i]
+				new_line = (line_to_modify[:x] + " " * len(line) + line_to_modify[x + len(line):])[:BOARD_WIDTH]
+				board[y + i] = new_line
 def print_bosses(x,y,char):
 	global board
 def print_bosses(x,y,char,frame,atack_type):
@@ -862,15 +905,7 @@ def boss_atack(type,x,y,char):
 			if 0 <= y < BOARD_HEIGHT and 0 <= x < BOARD_WIDTH:
 				board[y] = board[y][:x] + "•" + board[y][x+1:]
 	if type=="slam":
-		if char=="♔":
-			for i in range(-1,2):
-				if 0 <= y+i < BOARD_HEIGHT and 0 <= x < BOARD_WIDTH:
-					board[y+i] = board[y+i][:x] + "•" + board[y+i][x+1:]
-		elif char=="♕":
-			for i in range(-1,2):
-				if 0 <= y+i < BOARD_HEIGHT and 0 <= x < BOARD_WIDTH:
-					board[y+i] = board[y+i][:x] + "•" + board[y+i][x+1:]
-		elif char=="♖":	
+		if char=="♕":
 			for i in range(-1,2):
 				if 0 <= y+i < BOARD_HEIGHT and 0 <= x < BOARD_WIDTH:
 					board[y+i] = board[y+i][:x] + "•" + board[y+i][x+1:]
@@ -988,9 +1023,12 @@ def board_game_loop(playerx, playery):
 	# Ensure player position is within the buffer boundaries
 	if 0 <= local_playery < len(buffer) and 0 <= local_playerx < len(buffer[local_playery]):
 		buffer[local_playery][local_playerx] = player_char
-	print_buffer(buffer)
-	if debugging:
-		print(f"""botton_status:{botton_status}
+email_sent=False
+email_count=0
+reccored=False
+cooldown=0
+if debugging:
+	print(f"""botton_status:{botton_status}
 on_ground:{on_ground}
 move_left:{move_left}
 move_right:{move_right}
@@ -1011,9 +1049,6 @@ email sent:{email_sent}
 email count:{email_count}""")
 debug_log=[]
 tic=0
-reccored=False
-email_sent=False
-email_count=0
 cooldown=0
 # Main game loop
 while True:
@@ -1067,9 +1102,10 @@ while True:
 				print("you died")
 				playerx = savex
 				playery = savey
-				vol = 0
 			if move == "5" and cooldown==0:
 				cooldown=5
+				# Use the current aim direction based on player_char
+				shoot(playerx, playery, player_char)
 				shoot(playerx,playery,player_aim)
 			
 			if cooldown>0:
@@ -1079,6 +1115,8 @@ while True:
 			if move in ["1","2","3","4","5","6","7","8","9","0"]:
 				player_aim(move)
 			if move == "d" and move_right:
+				next_x = min(BOARD_WIDTH - 1, playerx + 1)
+			if board_val[playery][next_x] != "g" and not check_ground(board_val[playery][next_x]):
 				next_x = min(BOARD_WIDTH - 1, playerx + 1)
 			if board_val[playery][next_x] != "g" or not check_ground(board_val[playery][next_x]):
 				if board_val[next_y][next_x]!="g":
@@ -1091,15 +1129,15 @@ while True:
 
 			# --- Update Collision Flags ---
 			# Check if the player is on the ground
-			on_ground = playery + 1 < BOARD_HEIGHT and board_val[playery + 1][playerx] == "g" or check_ground(board_val[playery+1][playerx])
+			on_ground = (playery + 1 < BOARD_HEIGHT and board_val[playery + 1][playerx] == "g") or check_ground(board_val[playery+1][playerx])
 
 			if playerx > 0:
-				move_left = board_val[playery][playerx - 1] != "g" or check_ground(board_val[playery][playerx-1])
+				move_left = board_val[playery][playerx - 1] != "g" and not check_ground(board_val[playery][playerx-1])
 			else:
 				move_left = False
 
 			if playerx < BOARD_WIDTH - 1:
-				move_right = board_val[playery][playerx + 1] != "g" or check_ground(board_val[playery][playerx+1])
+				move_right = board_val[playery][playerx + 1] != "g" and not check_ground(board_val[playery][playerx+1])
 			else:
 				move_right = False
 
