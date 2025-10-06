@@ -29,6 +29,8 @@ def get_color(char):
 	colors = ["red", "purple", "blue", "green", "yellow", "orange"]
 	if char in compare_chars:
 		return colors[compare_chars.index(char)]
+#the sprites are going to be 20x20 pixels
+#plater is going to be 20x20 pixels but only use 20x10 pixels
 class goround_tiles:
 	grass = """🟩🟩🟩🟩
 🟩🟩🟩🟩
@@ -38,10 +40,26 @@ class goround_tiles:
  🟦🟦🟦🟦
  🟦🟦🟦🟦
  🟦🟦🟦🟦"""
-	spike = """    
+	spike_up = """    
  ⬜⬜ 
  ⬜⬜ 
 ⬜⬜⬜⬜"""
+	spike_down = """⬜⬜⬜⬜
+ ⬜⬜ 
+ ⬜⬜ 
+	"""
+	spike_left = """
+⬜   
+⬜⬜⬜ 
+⬜⬜⬜ 
+⬜   
+"""
+	spike_right = """
+   ⬜
+ ⬜⬜⬜
+ ⬜⬜⬜
+   ⬜
+"""
 	empty = """    
     
     
@@ -50,7 +68,10 @@ class goround_tiles:
     
  🟥🟥 
 ⬛⬛⬛⬛"""
-
+	block1_on= """🟫🟫🟫🟫
+🟫🆖🆖🟫
+🟫🆖🆖🟫
+🟫🟫🟫🟫"""
 class sprites:
 	player_up_faceing_left = """🟥🟥🟥🟥
 	🟥🟦🟦🟥
