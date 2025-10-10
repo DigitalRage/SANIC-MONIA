@@ -1,6 +1,7 @@
 {
 	"editor.fontFamily": "plaformer-Regular, 'Courier New', monospace",
 	"cSpell.words": [
+		"sudocode",
 		"TCSADRAIN"
 	],
 	"python-envs.defaultEnvManager": "ms-python.python:system",
