@@ -1,4 +1,0 @@
-sudocode yay
-def print_to_png():
-	not done
-def colishon(object1_hibox,object1_pixles,object2_hibox,object2_pixles):
