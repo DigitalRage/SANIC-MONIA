@@ -13,6 +13,8 @@ from sklearn.metrics import pairwise_distances_argmin_min
 from sklearn.preprocessing import StandardScaler
 import os
 import math
+import colorama
+import colorsys
 class color:
    PURPLE = '\033[95m'
    CYAN = '\033[96m'
