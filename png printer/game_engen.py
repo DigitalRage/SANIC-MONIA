@@ -1,5 +1,5 @@
 from PIL import Image
-import time,threading,queue,random,re,os,copy,calendar
+import time,threading,queue,random,re,os,copy,calendar,png_to_terminal
 # Constants
 TILE_SIZE = 20
 

@@ -47,7 +47,7 @@ def print_objs(objects_to_place):
 if __name__ == '__main__':
     for x in range(1, 100):
         objects_to_place = [
-            ('size.png',0,0)
+            ('size.png',0,0),
             ('player.png', 500, x),
             ('enemy.png', 200, 150),
             
