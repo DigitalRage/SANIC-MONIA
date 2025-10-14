@@ -56,14 +56,18 @@ def create_composite(objects):
 
 def print_image_in_terminal(image):
 	temp_path = 'temp_composite.png'
+	
 	image.save(temp_path)
+	os.system('clear')
 	img = from_file(temp_path)
+	
 	img.draw()
 	os.remove(temp_path)
 
 def print_objs(objects_to_place):
 	composite_image = create_composite(objects_to_place)
 	print_image_in_terminal(composite_image)
+	
 
 # ------------------ Entity creation ------------------
 
@@ -162,7 +166,7 @@ class Game:
 		self.current_room = None
 		self.map = Map()
 		self.player = None
-
+	
 	def add_room(self, room):
 		self.rooms[room.name] = room
 
@@ -212,7 +216,7 @@ class Game:
 		while True:
 			self.current_room.render()
 			self.map.display()
-			print(f"Health: {self.player['health']}/{self.player['max_health']}")
+			#print(f"Health: {self.player['health']}/{self.player['max_health']}")
 			print("Enter command: w/a/s/d to move, q to quit")
 			cmd = input().lower()
 			if cmd == 'q':
@@ -231,7 +235,6 @@ class Game:
 				new_y = self.player['y']
 			else:
 				continue
-
 			# Move smoothly
 			self.move_entity(self.player, new_x, new_y, duration=0.2)
 			# Check for door
@@ -281,7 +284,7 @@ def setup_game():
 	game = Game()
 
 	# Create rooms
-	main_room = Room('MainRoom', blocks=[(1,1), (2,2), (3,3)])
+	main_room = Room('MainRoom', blocks=[(1,1), (2,1), (3,1),(4,1),(4,0),(4,-1)])
 	item_room = Room('ItemRoom', blocks=[(5,5), (6,6), (7,7)])
 
 	# Add doors with facing directions and requirements
