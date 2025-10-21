@@ -19,6 +19,11 @@ Controls
 - + / - : zoom in / out
 - ESC or close window: quit
 
+Tile background mode
+
+- T : toggle tiled background using the currently-selected image
+- [ / ] : decrease / increase tile scale (when tiled mode is active)
+
 Notes
 
 - On some systems you may need to install additional SDL dependencies for pygame to support audio/video. See pygame docs if you get errors importing pygame.
