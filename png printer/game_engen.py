@@ -17,7 +17,6 @@ finally:
 is_faiding = False
 
 # --- SCREEN ---
-# screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
 screen = pygame.display.set_mode((400, 400))
 SCREEN_WIDTH, SCREEN_HEIGHT = screen.get_size()
 pygame.display.set_caption("Python Metroidvania")
@@ -45,7 +44,43 @@ def stop_sound():
 # --- CONSTANTS ---
 TILE_SIZE = 30
 
-# --- GAME ELEMENTS ---
+# --- Enemy class with wall-following logic ---
+class Enemy:
+    def __init__(self, x, y, width=30, height=30, speed=2):
+        self.x = x
+        self.y = y
+        self.width = width
+        self.height = height
+        self.speed = speed
+        self.rect = pygame.Rect(self.x, self.y, self.width, self.height)
+        self.direction = 1  # 1 for right, -1 for left
+
+    def move_along_wall(self, walls):
+        # Move horizontally
+        self.x += self.speed * self.direction
+        self.rect.x = self.x
+
+        # Check collision with walls
+        collided = False
+        for wall in walls:
+            if self.rect.colliderect(wall.rect):
+                collided = True
+                break
+
+        if collided:
+            # Reverse direction on wall collision
+            self.direction *= -1
+            self.x += self.speed * self.direction * 2
+            self.rect.x = self.x
+
+    def draw(self, surface, camera_x, camera_y):
+        # Draw top red, bottom black
+        top_rect = pygame.Rect(self.x - camera_x, self.y - camera_y, self.width, self.height // 2)
+        bottom_rect = pygame.Rect(self.x - camera_x, self.y - camera_y + self.height // 2, self.width, self.height // 2)
+        pygame.draw.rect(surface, (255, 0, 0), top_rect)
+        pygame.draw.rect(surface, (0, 0, 0), bottom_rect)
+
+# --- Game Elements ---
 class Wall:
     def __init__(self, x, y, width, height):
         self.rect = pygame.Rect(x, y, width, height)
@@ -75,6 +110,7 @@ class Room:
         self.entities = []
         self.door_locations_x = []
         self.door_locations_y = []
+        self.enemies = []
 
     def get_door_location(self, choice):
         if choice == "x":
@@ -84,29 +120,40 @@ class Room:
 
     def load_room(self, doors):
         self.walls = []
+        self.enemies = []
         self.doors = doors
         for y, row in enumerate(self.layout):
             for x, tile in enumerate(row):
                 if tile == '#':
                     self.walls.append(Wall(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE))
+        # Add enemies for demo
+        if self.name == "main room":
+            self.enemies.append(Enemy(50, 50))
+            self.enemies.append(Enemy(150, 100))
 
     def add_door(self, door, spawn_x=100, spawn_y=100):
         self.doors.append(door)
         self.door_locations_x.append(spawn_x)
         self.door_locations_y.append(spawn_y)
 
+    def update_enemies(self):
+        for enemy in self.enemies:
+            enemy.move_along_wall(self.walls)
+
     def render(self, surface, camera_x, camera_y):
         self.room_surface.fill((0, 0, 0))
-        # Draw walls and doors
+        # Walls
         for wall in self.walls:
             pygame.draw.rect(self.room_surface, (0, 255, 0),
                              pygame.Rect(wall.rect.x - camera_x, wall.rect.y - camera_y, TILE_SIZE, TILE_SIZE))
+        # Doors
         for door in self.doors:
             pygame.draw.rect(self.room_surface, (255, 255, 0),
                              pygame.Rect(door.rect.x - camera_x, door.rect.y - camera_y, TILE_SIZE, TILE_SIZE))
-        # Draw entities (optional)
-        for entity in self.entities:
-            self.room_surface.blit(entity['image'], (entity['x'] - camera_x, entity['y'] - camera_y))
+        # Enemies
+        for enemy in self.enemies:
+            enemy.draw(self.room_surface, camera_x, camera_y)
+
         surface.blit(self.room_surface, (0, 0))
 
     def get_door_at(self, player_rect):
@@ -115,7 +162,7 @@ class Room:
                 return door
         return None
 
-# --- MAIN GAME CLASS ---
+# --- Main Game Class ---
 class Game:
     def __init__(self):
         self.rooms = {}
@@ -143,14 +190,12 @@ class Game:
         self.fade_alpha = 0
         self.fading = False
         self.next_room = None
-        # For spawn position
         self.next_spawn_x = 100
         self.next_spawn_y = 100
 
     def get_player_rec(self):
         return self.player["rect"]
 
-    # Room management
     def add_room(self, room):
         self.rooms[room.name] = room
 
@@ -160,13 +205,10 @@ class Game:
             print(f"Room '{room_name}' not found.")
             return
         self.current_room.load_room(self.current_room.doors)
-
-        # Set player position
         self.player['x'] = spawn_x
         self.player['y'] = spawn_y
         self.player['rect'].topleft = (self.player['x'], self.player['y'])
 
-    # Movement and physics
     def move(self, dx):
         self.player['x'] += dx
         self.player['rect'].x = self.player['x']
@@ -198,7 +240,6 @@ class Game:
                     self.player['y_velocity'] = 0
                 self.player['y'] = self.player['rect'].y
 
-    # Input handling
     def handle_input(self):
         global is_faiding
         if not is_faiding:
@@ -208,7 +249,6 @@ class Game:
                 dx -= self.player['speed']
             if keys[pygame.K_RIGHT]:
                 dx += self.player['speed']
-            # Jump logic
             jump_key = keys[pygame.K_UP] or keys[pygame.K_SPACE]
             if jump_key and self.player['on_ground'] and not self.player['jump_pressed']:
                 self.player['y_velocity'] = self.jump_strength
@@ -221,18 +261,16 @@ class Game:
             if not jump_key:
                 self.player['jump_pressed'] = False
 
-            self.move(dx)
-            if keys[pygame.K_ESCAPE]:
-                self.running = False
-            if keys[pygame.K_TAB]:
-                self.player["x"] = 100
-                self.player["y"] = 100
+        self.move(dx)
+        if keys[pygame.K_ESCAPE]:
+            self.running = False
+        if keys[pygame.K_TAB]:
+            self.player["x"] = 100
+            self.player["y"] = 100
 
-    # Doors
     def check_for_door_and_transition(self):
         door = self.current_room.get_door_at(self.player['rect'])
         if door and door.can_open(self.player['items']):
-            # Get spawn position from door
             index = self.current_room.doors.index(door)
             spawn_x = self.current_room.door_locations_x[index]
             spawn_y = self.current_room.door_locations_y[index]
@@ -264,7 +302,6 @@ class Game:
                 self.fading = False
                 is_faiding = False
 
-    # Main loop
     def run(self):
         clock = pygame.time.Clock()
         try:
@@ -283,6 +320,15 @@ class Game:
             self.check_for_door_and_transition()
             self.update_fade()
 
+            # Update enemies
+            if self.current_room:
+                self.current_room.update_enemies()
+
+            # Check collision with enemies
+            for enemy in self.current_room.enemies:
+                if self.player['rect'].colliderect(enemy.rect):
+                    print("Player hit by enemy!")
+
             camera_x = self.player['x'] - SCREEN_WIDTH // 2 + self.player['width'] // 2
             camera_y = self.player['y'] - SCREEN_HEIGHT // 2 + self.player['height'] // 2
             camera_x = max(0, min(camera_x, self.current_room.room_width - SCREEN_WIDTH))
@@ -291,10 +337,12 @@ class Game:
             screen.fill((0, 0, 0))
             self.current_room.render(screen, camera_x, camera_y)
 
+            # Draw player
             player_screen_x = self.player['x'] - camera_x
             player_screen_y = self.player['y'] - camera_y
             screen.blit(self.player['image'], (player_screen_x, player_screen_y))
 
+            # Fade overlay
             if self.fading:
                 self.fade_surface.set_alpha(self.fade_alpha)
                 screen.blit(self.fade_surface, (0, 0))
@@ -303,11 +351,12 @@ class Game:
             clock.tick(60)
         pygame.quit()
 
-# --- GAME SETUP ---
+# --- Setup the game environment ---
 def setup_game():
     game = Game()
     main_room_layout = [
         "##############################################################################",
+        "#                                     #                                      #",
         "#                                     #                                      #",
         "#                                     #                                      #",
         "#                                     #                                      #",
@@ -385,7 +434,7 @@ def setup_game():
     game.set_current_room("main room")
     return game
 
-# --- RUN ---
+# --- Run the game ---
 if __name__ == "__main__":
     game = setup_game()
     game.run()
