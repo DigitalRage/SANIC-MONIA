@@ -1,7 +1,13 @@
 import os
 import glob
+from flask import Flask
+app = Flask(__name__)
+
+
+
+
 os.environ['SDL_AUDIODRIVER'] = 'dummy'
-import pygame # Now import pygame
+import pygame 
 # --- Setup ---
 pygame.init()
 windowed_size = (800, 600)
@@ -235,12 +241,46 @@ def resolve_map(template, key_map):
         out.append(out_row)
     return out
 
-# resolve initial maps using loaded assets
-background_map = resolve_map(background_template, assets)
-ground_map = resolve_map(ground_template, assets)
+# Multi-room support: store templates per-room and provide switching helpers.
+# Start with a single room using the existing templates for backward compatibility.
+rooms = [
+    {
+        'background_template': background_template,
+        'ground_template': ground_template,
+        'name': 'Room 1',
+    }
+]
 
-background_tiles = build_tiles(background_map, small_size)
-ground_tiles = build_tiles(ground_map, small_size)
+# current room index
+current_room = 0
+
+def load_room(idx: int):
+    """Switch global templates and rebuild resolved maps/tiles for room `idx`.
+    Index wraps around the available rooms.
+    """
+    global current_room, background_template, ground_template
+    current_room = idx % len(rooms)
+    # point the global template variables to the selected room's templates
+    background_template = rooms[current_room]['background_template']
+    ground_template = rooms[current_room]['ground_template']
+    # rebuild resolved maps and tile objects
+    rebuild_maps_and_tiles()
+
+def next_room():
+    load_room(current_room + 1)
+
+def prev_room():
+    load_room(current_room - 1)
+
+def rebuild_maps_and_tiles():
+    global background_map, ground_map, background_tiles, ground_tiles
+    background_map = resolve_map(background_template, assets)
+    ground_map = resolve_map(ground_template, assets)
+    background_tiles = build_tiles(background_map, small_size)
+    ground_tiles = build_tiles(ground_map, small_size)
+
+# initialize maps/tiles for starting room
+rebuild_maps_and_tiles()
 
 
 def save_templates_to_file():
@@ -480,245 +520,248 @@ def resolve_player_collisions(dx, dy):
             player_rect.y += 1
 
     return landed
+@app.route('/')
+def main():
+    # --- Main loop ---
+    camera_offset = pygame.Vector2(0, 0)
+    scroll_speed = 10
+    show_grid = True
+    fullscreen = False
+    camera_follows = True
+    running = True
+    # Editor state
+    editor_mode = False
+    editing_ground = False  # if True edit ground_template, else background_template
+    # order of editable keys (two-letter names) for selection with + / -
+    key_order = ['AA', 'BA', 'BB', 'FG', 'FA', 'FB', 'FC', 'FD', 'FE', 'FF', 'FH', 'FI', 'FJ', 'FK', 'FL', 'FM']
+    selected_idx = 0
 
-# --- Main loop ---
-camera_offset = pygame.Vector2(0, 0)
-scroll_speed = 10
-show_grid = True
-fullscreen = False
-camera_follows = True
-running = True
-# Editor state
-editor_mode = False
-editing_ground = False  # if True edit ground_template, else background_template
-# order of editable keys (two-letter names) for selection with + / -
-key_order = ['AA', 'BA', 'BB', 'FG', 'FA', 'FB', 'FC', 'FD', 'FE', 'FF', 'FH', 'FI', 'FJ', 'FK', 'FL', 'FM']
-selected_idx = 0
+    # map key names to Key tokens so templates can be assigned without quotes
+    key_token_map = {k: globals().get(k) for k in key_order}
+    # help visibility
+    show_help = True
 
-# map key names to Key tokens so templates can be assigned without quotes
-key_token_map = {k: globals().get(k) for k in key_order}
-# help visibility
-show_help = True
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT or (
+                event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
+                running = False
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_g:
+                    show_grid = not show_grid
+                elif event.key == pygame.K_c:
+                    # toggle camera follow mode
+                    camera_follows = not camera_follows
+                elif event.key == pygame.K_f:
+                    fullscreen = not fullscreen
+                    if fullscreen:
+                        info = pygame.display.Info()
+                        screen = pygame.display.set_mode((info.current_w, info.current_h), pygame.FULLSCREEN)
+                    else:
+                        screen = pygame.display.set_mode(windowed_size, pygame.RESIZABLE)
+                    small_size, large_size = get_tile_sizes(screen.get_size())
+                    # reload assets at the new size and rebuild maps
+                    assets = load_tile_surfaces(small_size, large_size)
+                    background_map = resolve_map(background_template, assets)
+                    ground_map = resolve_map(ground_template, assets)
+                    background_tiles = build_tiles(background_map, small_size)
+                    ground_tiles = build_tiles(ground_map, small_size)
+                elif event.key == pygame.K_d:
+                    # toggle editor mode
+                    editor_mode = not editor_mode
+                    # when entering editor, stop camera follow so arrow keys pan
+                    if editor_mode:
+                        prev_camera_follows = camera_follows
+                        camera_follows = False
+                    else:
+                        # restore camera follow
+                        camera_follows = True
+                elif event.key == pygame.K_h:
+                    show_help = not show_help
+                elif event.key == pygame.K_t:
+                    # toggle editing layer between background_template and ground_template
+                    editing_ground = not editing_ground
+                elif event.key in (pygame.K_EQUALS, pygame.K_PLUS):
+                    # next tile
+                    selected_idx = (selected_idx + 1) % len(key_order)
+                elif event.key == pygame.K_MINUS:
+                    selected_idx = (selected_idx - 1) % len(key_order)
+                elif event.key == pygame.K_s:
+                    # save templates back into this python file (overwrite definitions)
+                    try:
+                        save_templates_to_file()
+                        print('Templates saved to file')
+                    except Exception as e:
+                        print('Failed to save templates:', e)
 
-while running:
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT or (
-            event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
-            running = False
-        elif event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_g:
-                show_grid = not show_grid
-            elif event.key == pygame.K_c:
-                # toggle camera follow mode
-                camera_follows = not camera_follows
-            elif event.key == pygame.K_f:
-                fullscreen = not fullscreen
-                if fullscreen:
-                    info = pygame.display.Info()
-                    screen = pygame.display.set_mode((info.current_w, info.current_h), pygame.FULLSCREEN)
-                else:
-                    screen = pygame.display.set_mode(windowed_size, pygame.RESIZABLE)
-                small_size, large_size = get_tile_sizes(screen.get_size())
+            elif event.type == pygame.VIDEORESIZE:
+                screen = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
+                small_size, large_size = get_tile_sizes((event.w, event.h))
                 # reload assets at the new size and rebuild maps
                 assets = load_tile_surfaces(small_size, large_size)
                 background_map = resolve_map(background_template, assets)
                 ground_map = resolve_map(ground_template, assets)
                 background_tiles = build_tiles(background_map, small_size)
                 ground_tiles = build_tiles(ground_map, small_size)
-            elif event.key == pygame.K_d:
-                # toggle editor mode
-                editor_mode = not editor_mode
-                # when entering editor, stop camera follow so arrow keys pan
-                if editor_mode:
-                    prev_camera_follows = camera_follows
-                    camera_follows = False
-                else:
-                    # restore camera follow
-                    camera_follows = True
-            elif event.key == pygame.K_h:
-                show_help = not show_help
-            elif event.key == pygame.K_t:
-                # toggle editing layer between background_template and ground_template
-                editing_ground = not editing_ground
-            elif event.key in (pygame.K_EQUALS, pygame.K_PLUS):
-                # next tile
-                selected_idx = (selected_idx + 1) % len(key_order)
-            elif event.key == pygame.K_MINUS:
-                selected_idx = (selected_idx - 1) % len(key_order)
-            elif event.key == pygame.K_s:
-                # save templates back into this python file (overwrite definitions)
-                try:
-                    save_templates_to_file()
-                    print('Templates saved to file')
-                except Exception as e:
-                    print('Failed to save templates:', e)
+            elif event.type == pygame.MOUSEBUTTONDOWN and editor_mode:
+                # place or erase tiles in the active template
+                mx, my = event.pos
+                # convert to world coords
+                wx = mx - camera_offset.x
+                wy = my - camera_offset.y
+                col = int(wx // small_size[0])
+                row = int(wy // small_size[1])
+                # pick the active template
+                template = ground_template if editing_ground else background_template
+                if 0 <= row < len(template) and 0 <= col < len(template[row]):
+                    if event.button == 1:
+                        # left click: place selected tile token
+                        token_name = key_order[selected_idx]
+                        token = key_token_map.get(token_name)
+                        template[row][col] = token
+                    elif event.button == 3:
+                        # right click: clear
+                        template[row][col] = NA
+                    # after modification rebuild resolved maps and tiles
+                    background_map = resolve_map(background_template, assets)
+                    ground_map = resolve_map(ground_template, assets)
+                    background_tiles = build_tiles(background_map, small_size)
+                    ground_tiles = build_tiles(ground_map, small_size)
+                    
 
-        elif event.type == pygame.VIDEORESIZE:
-            screen = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
-            small_size, large_size = get_tile_sizes((event.w, event.h))
-            # reload assets at the new size and rebuild maps
-            assets = load_tile_surfaces(small_size, large_size)
-            background_map = resolve_map(background_template, assets)
-            ground_map = resolve_map(ground_template, assets)
-            background_tiles = build_tiles(background_map, small_size)
-            ground_tiles = build_tiles(ground_map, small_size)
-        elif event.type == pygame.MOUSEBUTTONDOWN and editor_mode:
-            # place or erase tiles in the active template
-            mx, my = event.pos
-            # convert to world coords
+        keys = pygame.key.get_pressed()
+        # camera controls
+        if editor_mode:
+            # in editor mode, arrow keys pan the camera directly
+            if keys[pygame.K_LEFT]:
+                camera_offset.x += scroll_speed
+            if keys[pygame.K_RIGHT]:
+                camera_offset.x -= scroll_speed
+            if keys[pygame.K_UP]:
+                camera_offset.y += scroll_speed
+            if keys[pygame.K_DOWN]:
+                camera_offset.y -= scroll_speed
+        else:
+            # camera controls (Shift + arrows) when camera isn't following the player
+            if not camera_follows:
+                if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
+                    if keys[pygame.K_LEFT]:
+                        camera_offset.x += scroll_speed
+                    if keys[pygame.K_RIGHT]:
+                        camera_offset.x -= scroll_speed
+                    if keys[pygame.K_UP]:
+                        camera_offset.y += scroll_speed
+                    if keys[pygame.K_DOWN]:
+                        camera_offset.y -= scroll_speed
+
+        # player input (A/D or left/right), jump with W or SPACE or UP
+        move_x = 0
+        if keys[pygame.K_a] or keys[pygame.K_LEFT]:
+            move_x = -speed
+        if keys[pygame.K_d] or keys[pygame.K_RIGHT]:
+            move_x = speed
+
+        # apply horizontal movement and resolve collisions
+        resolve_player_collisions(move_x, 0)
+
+        # jump (only when on ground)
+        if (keys[pygame.K_w] or keys[pygame.K_SPACE] or keys[pygame.K_UP]) and on_ground:
+            vel.y = jump_speed
+
+        # apply gravity
+        vel.y += gravity
+
+        # apply vertical movement and resolve collisions
+        on_ground = resolve_player_collisions(0, int(vel.y))
+
+        # camera follow: center camera on player (in world coords)
+        if camera_follows:
+            sw, sh = screen.get_size()
+            # center player on screen
+            camera_offset.x = (sw // 2) - (player_rect.x + player_rect.width // 2)
+            camera_offset.y = (sh // 2) - (player_rect.y + player_rect.height // 2)
+
+        # Editor hover preview
+        hover_preview = None
+        hover_pos = None
+        if editor_mode:
+            mx, my = pygame.mouse.get_pos()
             wx = mx - camera_offset.x
             wy = my - camera_offset.y
             col = int(wx // small_size[0])
             row = int(wy // small_size[1])
-            # pick the active template
             template = ground_template if editing_ground else background_template
             if 0 <= row < len(template) and 0 <= col < len(template[row]):
-                if event.button == 1:
-                    # left click: place selected tile token
-                    token_name = key_order[selected_idx]
-                    token = key_token_map.get(token_name)
-                    template[row][col] = token
-                elif event.button == 3:
-                    # right click: clear
-                    template[row][col] = NA
-                # after modification rebuild resolved maps and tiles
-                background_map = resolve_map(background_template, assets)
-                ground_map = resolve_map(ground_template, assets)
-                background_tiles = build_tiles(background_map, small_size)
-                ground_tiles = build_tiles(ground_map, small_size)
-                
+                token_name = key_order[selected_idx]
+                surf = assets.get(token_name)
+                if surf is not None:
+                    hover_preview = surf.copy()
+                    try:
+                        hover_preview.set_alpha(160)
+                    except Exception:
+                        pass
+                    hover_pos = (int(col * small_size[0] + camera_offset.x), int(row * small_size[1] + camera_offset.y))
 
-    keys = pygame.key.get_pressed()
-    # camera controls
-    if editor_mode:
-        # in editor mode, arrow keys pan the camera directly
-        if keys[pygame.K_LEFT]:
-            camera_offset.x += scroll_speed
-        if keys[pygame.K_RIGHT]:
-            camera_offset.x -= scroll_speed
-        if keys[pygame.K_UP]:
-            camera_offset.y += scroll_speed
-        if keys[pygame.K_DOWN]:
-            camera_offset.y -= scroll_speed
-    else:
-        # camera controls (Shift + arrows) when camera isn't following the player
-        if not camera_follows:
-            if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
-                if keys[pygame.K_LEFT]:
-                    camera_offset.x += scroll_speed
-                if keys[pygame.K_RIGHT]:
-                    camera_offset.x -= scroll_speed
-                if keys[pygame.K_UP]:
-                    camera_offset.y += scroll_speed
-                if keys[pygame.K_DOWN]:
-                    camera_offset.y -= scroll_speed
+        screen.fill((30, 30, 30))
 
-    # player input (A/D or left/right), jump with W or SPACE or UP
-    move_x = 0
-    if keys[pygame.K_a] or keys[pygame.K_LEFT]:
-        move_x = -speed
-    if keys[pygame.K_d] or keys[pygame.K_RIGHT]:
-        move_x = speed
+        for tile in background_tiles:
+            tile.draw(screen, camera_offset)
 
-    # apply horizontal movement and resolve collisions
-    resolve_player_collisions(move_x, 0)
+        # Draw player (apply camera offset) only when not in editor mode
+        if not editor_mode:
+            screen.blit(player_image, (int(player_rect.x + camera_offset.x), int(player_rect.y + camera_offset.y)))
 
-    # jump (only when on ground)
-    if (keys[pygame.K_w] or keys[pygame.K_SPACE] or keys[pygame.K_UP]) and on_ground:
-        vel.y = jump_speed
+        # Draw ground tiles on top of the player
+        for tile in ground_tiles:
+            tile.draw(screen, camera_offset)
 
-    # apply gravity
-    vel.y += gravity
+        # draw hover preview last so it's on top
+        if hover_preview and hover_pos:
+            screen.blit(hover_preview, hover_pos)
 
-    # apply vertical movement and resolve collisions
-    on_ground = resolve_player_collisions(0, int(vel.y))
+        # UI: show help and editor status (H toggles visibility)
+        font = pygame.font.SysFont(None, 20)
+        help_lines = [
+            "D - Toggle Editor Mode (enter/exit)",
+            "T - Switch Layer (Grid / Ground)",
+            "+ / - - Change selected tile",
+            "Mouse L - Place tile  |  Mouse R - Erase tile",
+            "S - Save templates to this python file (creates .bak backup)",
+            "C - Toggle camera follow",
+            "Arrow keys - Pan camera in Editor / Move player in Play",
+            "Shift + Arrows - Pan camera when not following",
+            "A/D or ←/→ - Player move  |  W / Space / ↑ - Jump",
+            "G - Toggle grid  |  F - Toggle fullscreen",
+        ]
 
-    # camera follow: center camera on player (in world coords)
-    if camera_follows:
-        sw, sh = screen.get_size()
-        # center player on screen
-        camera_offset.x = (sw // 2) - (player_rect.x + player_rect.width // 2)
-        camera_offset.y = (sh // 2) - (player_rect.y + player_rect.height // 2)
+        line_h = font.get_linesize()
+        # Always show the H hint on the very top-left
+        hint = f"H - {'Hide' if show_help else 'Show'} Help"
+        hint_surf = font.render(hint, True, (240, 240, 120))
+        screen.blit(hint_surf, (8, 8))
 
-    # Editor hover preview
-    hover_preview = None
-    hover_pos = None
-    if editor_mode:
-        mx, my = pygame.mouse.get_pos()
-        wx = mx - camera_offset.x
-        wy = my - camera_offset.y
-        col = int(wx // small_size[0])
-        row = int(wy // small_size[1])
-        template = ground_template if editing_ground else background_template
-        if 0 <= row < len(template) and 0 <= col < len(template[row]):
-            token_name = key_order[selected_idx]
-            surf = assets.get(token_name)
-            if surf is not None:
-                hover_preview = surf.copy()
-                try:
-                    hover_preview.set_alpha(160)
-                except Exception:
-                    pass
-                hover_pos = (int(col * small_size[0] + camera_offset.x), int(row * small_size[1] + camera_offset.y))
+        # If help is enabled, render the help lines below the H hint
+        top_y = 8 + line_h
+        if show_help:
+            for i, line in enumerate(help_lines):
+                surf = font.render(line, True, (200, 200, 200))
+                screen.blit(surf, (8, top_y + i * line_h))
+            status_y = top_y + len(help_lines) * line_h + 4
+        else:
+            status_y = top_y + 4
 
-    screen.fill((30, 30, 30))
+        # draw concise status below help/hint
+        status = f"MODE: {'EDITOR' if editor_mode else 'PLAY'}  LAYER: {'GROUND' if editing_ground else 'GRID'}  SELECT: {key_order[selected_idx]}"
+        status_surf = font.render(status, True, (220, 220, 220))
+        screen.blit(status_surf, (8, status_y))
 
-    for tile in background_tiles:
-        tile.draw(screen, camera_offset)
+        if show_grid:
+            cols = max((len(r) for r in background_map), default=0)
+            draw_grid(screen, len(background_map), cols, small_size[0], camera_offset)
 
-    # Draw player (apply camera offset) only when not in editor mode
-    if not editor_mode:
-        screen.blit(player_image, (int(player_rect.x + camera_offset.x), int(player_rect.y + camera_offset.y)))
+        pygame.display.flip()
+        clock.tick(60)
 
-    # Draw ground tiles on top of the player
-    for tile in ground_tiles:
-        tile.draw(screen, camera_offset)
-
-    # draw hover preview last so it's on top
-    if hover_preview and hover_pos:
-        screen.blit(hover_preview, hover_pos)
-
-    # UI: show help and editor status (H toggles visibility)
-    font = pygame.font.SysFont(None, 20)
-    help_lines = [
-        "D - Toggle Editor Mode (enter/exit)",
-        "T - Switch Layer (Grid / Ground)",
-        "+ / - - Change selected tile",
-        "Mouse L - Place tile  |  Mouse R - Erase tile",
-        "S - Save templates to this python file (creates .bak backup)",
-        "C - Toggle camera follow",
-        "Arrow keys - Pan camera in Editor / Move player in Play",
-        "Shift + Arrows - Pan camera when not following",
-        "A/D or ←/→ - Player move  |  W / Space / ↑ - Jump",
-        "G - Toggle grid  |  F - Toggle fullscreen",
-    ]
-
-    line_h = font.get_linesize()
-    # Always show the H hint on the very top-left
-    hint = f"H - {'Hide' if show_help else 'Show'} Help"
-    hint_surf = font.render(hint, True, (240, 240, 120))
-    screen.blit(hint_surf, (8, 8))
-
-    # If help is enabled, render the help lines below the H hint
-    top_y = 8 + line_h
-    if show_help:
-        for i, line in enumerate(help_lines):
-            surf = font.render(line, True, (200, 200, 200))
-            screen.blit(surf, (8, top_y + i * line_h))
-        status_y = top_y + len(help_lines) * line_h + 4
-    else:
-        status_y = top_y + 4
-
-    # draw concise status below help/hint
-    status = f"MODE: {'EDITOR' if editor_mode else 'PLAY'}  LAYER: {'GROUND' if editing_ground else 'GRID'}  SELECT: {key_order[selected_idx]}"
-    status_surf = font.render(status, True, (220, 220, 220))
-    screen.blit(status_surf, (8, status_y))
-
-    if show_grid:
-        cols = max((len(r) for r in background_map), default=0)
-        draw_grid(screen, len(background_map), cols, small_size[0], camera_offset)
-
-    pygame.display.flip()
-    clock.tick(60)
-
-pygame.quit()
+    pygame.quit()
+if __name__ == "__main__":
+    main()
