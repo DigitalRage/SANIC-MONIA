@@ -14,10 +14,11 @@ finally:
         pygame.mixer.init()
     except:
         pass
-is_faiding=False
+is_faiding = False
+
 # --- SCREEN ---
-#screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
-screen=pygame.display.set_mode((150,150))
+# screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+screen = pygame.display.set_mode((400, 400))
 SCREEN_WIDTH, SCREEN_HEIGHT = screen.get_size()
 pygame.display.set_caption("Python Metroidvania")
 
@@ -72,13 +73,14 @@ class Room:
         self.walls = []
         self.doors = []
         self.entities = []
-        self.door_locations_x=[]
-        self.door_locations_y=[]
-    def get_door_location(self,choise):
-        if choise=="x":
-            return self.door_locations_y[self.get_door_at(Game.get_player_rec())][0]
+        self.door_locations_x = []
+        self.door_locations_y = []
+
+    def get_door_location(self, choice):
+        if choice == "x":
+            return self.door_locations_x
         else:
-            return self.door_locations_y[self.get_door_at(Game.get_player_rec())][1]
+            return self.door_locations_y
 
     def load_room(self, doors):
         self.walls = []
@@ -88,10 +90,11 @@ class Room:
                 if tile == '#':
                     self.walls.append(Wall(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE))
 
-    def add_door(self, door,spawn_x=100,spawn_y=100):
+    def add_door(self, door, spawn_x=100, spawn_y=100):
         self.doors.append(door)
         self.door_locations_x.append(spawn_x)
         self.door_locations_y.append(spawn_y)
+
     def render(self, surface, camera_x, camera_y):
         self.room_surface.fill((0, 0, 0))
         # Draw walls and doors
@@ -104,7 +107,6 @@ class Room:
         # Draw entities (optional)
         for entity in self.entities:
             self.room_surface.blit(entity['image'], (entity['x'] - camera_x, entity['y'] - camera_y))
-
         surface.blit(self.room_surface, (0, 0))
 
     def get_door_at(self, player_rect):
@@ -141,11 +143,14 @@ class Game:
         self.fade_alpha = 0
         self.fading = False
         self.next_room = None
+        # For spawn position
+        self.next_spawn_x = 100
+        self.next_spawn_y = 100
+
     def get_player_rec(self):
         return self.player["rect"]
-    # -----------------------------
-    # ROOM MANAGEMENT
-    # -----------------------------
+
+    # Room management
     def add_room(self, room):
         self.rooms[room.name] = room
 
@@ -154,28 +159,14 @@ class Game:
         if not self.current_room:
             print(f"Room '{room_name}' not found.")
             return
+        self.current_room.load_room(self.current_room.doors)
 
-        self.current_room.load_room(self.rooms.get(room_name).doors)
-
-        # Default safe spawn
-        
-
-        # If coming from another room, find the matching door
-        if previous_room_name:
-            for new_door in self.current_room.doors:
-                if new_door.destination == previous_room_name:
-                    # Place player just outside that door, facing inward
-                    spawn_x = new_door.x_grid * TILE_SIZE + TILE_SIZE * 2
-                    spawn_y = new_door.y_grid * TILE_SIZE
-                    break
-
+        # Set player position
         self.player['x'] = spawn_x
         self.player['y'] = spawn_y
         self.player['rect'].topleft = (self.player['x'], self.player['y'])
 
-    # -----------------------------
-    # MOVEMENT AND PHYSICS
-    # -----------------------------
+    # Movement and physics
     def move(self, dx):
         self.player['x'] += dx
         self.player['rect'].x = self.player['x']
@@ -207,9 +198,7 @@ class Game:
                     self.player['y_velocity'] = 0
                 self.player['y'] = self.player['rect'].y
 
-    # -----------------------------
-    # INPUT
-    # -----------------------------
+    # Input handling
     def handle_input(self):
         global is_faiding
         if not is_faiding:
@@ -219,7 +208,6 @@ class Game:
                 dx -= self.player['speed']
             if keys[pygame.K_RIGHT]:
                 dx += self.player['speed']
-
             # Jump logic
             jump_key = keys[pygame.K_UP] or keys[pygame.K_SPACE]
             if jump_key and self.player['on_ground'] and not self.player['jump_pressed']:
@@ -237,25 +225,26 @@ class Game:
             if keys[pygame.K_ESCAPE]:
                 self.running = False
             if keys[pygame.K_TAB]:
-                self.player["x"]=100
-                self.player["y"]=100
+                self.player["x"] = 100
+                self.player["y"] = 100
 
-    # -----------------------------
-    # DOORS
-    # -----------------------------
+    # Doors
     def check_for_door_and_transition(self):
         door = self.current_room.get_door_at(self.player['rect'])
         if door and door.can_open(self.player['items']):
-            self.start_fade(door.destination)
+            # Get spawn position from door
+            index = self.current_room.doors.index(door)
+            spawn_x = self.current_room.door_locations_x[index]
+            spawn_y = self.current_room.door_locations_y[index]
+            self.start_fade(door.destination, spawn_x, spawn_y)
 
-    # -----------------------------
-    # FADE TRANSITION
-    # -----------------------------
-    def start_fade(self, next_room_name):
+    def start_fade(self, next_room_name, door_spawn_x, door_spawn_y):
         global is_faiding
         self.fading = "fadeout"
         self.next_room = next_room_name
         self.fade_alpha = 0
+        self.next_spawn_x = door_spawn_x
+        self.next_spawn_y = door_spawn_y
 
     def update_fade(self):
         global is_faiding
@@ -266,18 +255,16 @@ class Game:
             if self.fade_alpha >= 255:
                 self.fade_alpha = 255
                 previous = self.current_room.name
-                self.set_current_room(self.next_room ,Room.get_door_location(Room,"x"),Room.get_door_location(Room,"y"),previous_room_name=previous)
+                self.set_current_room(self.next_room, self.next_spawn_x, self.next_spawn_y, previous_room_name=previous)
                 self.fading = "fadein"
         elif self.fading == "fadein":
             self.fade_alpha -= 10
             if self.fade_alpha <= 0:
                 self.fade_alpha = 0
                 self.fading = False
-                is_faiding=False
+                is_faiding = False
 
-    # -----------------------------
-    # MAIN LOOP
-    # -----------------------------
+    # Main loop
     def run(self):
         clock = pygame.time.Clock()
         try:
@@ -368,8 +355,8 @@ def setup_game():
         "##############################################################################",
     ]
     main_room = Room("main room", main_room_layout)
-    main_room.add_door(Door(1, 43, "item room"))
-    main_room.add_door(Door(76, 43, "basic room"))
+    main_room.add_door(Door(1, 43, "item room"), 100, 100)
+    main_room.add_door(Door(76, 43, "basic room"), 100, 100)
     game.add_room(main_room)
 
     item_room_layout = [
@@ -381,18 +368,20 @@ def setup_game():
         "##############",
     ]
     item_room = Room("item room", item_room_layout)
-    item_room.add_door(Door(10, 4, "main room"))
+    item_room.add_door(Door(10, 4, "main room"), 100, 100)
     game.add_room(item_room)
-    basic_room_layout=[
-"############",
-"#          #",
-"           #",
-" d         #",
-"############"
-]
-    basic_room = Room("basic room",basic_room_layout)
-    basic_room.add_door(Door(2,3,"main room"))
+
+    basic_room_layout = [
+        "############",
+        "#          #",
+        "           #",
+        " d         #",
+        "############"
+    ]
+    basic_room = Room("basic room", basic_room_layout)
+    basic_room.add_door(Door(2, 3, "main room"), 100, 50)
     game.add_room(basic_room)
+
     game.set_current_room("main room")
     return game
 
