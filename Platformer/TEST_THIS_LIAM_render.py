@@ -6,7 +6,7 @@ import glob
 pygame.init()
 windowed_size = (800, 600)
 screen = pygame.display.set_mode(windowed_size, pygame.RESIZABLE)
-pygame.display.set_caption("Tile Grid with Foreground Collision")
+pygame.display.set_caption("Tile Grid with Ground Collision")
 clock = pygame.time.Clock()
 
 # --- Load and scale tile images ---
@@ -20,13 +20,13 @@ def load_tile(filename, size):
         return pygame.Surface(size, pygame.SRCALPHA)
 
 
-def load_foreground_any(size, preferred="ground_greye.png"):
+def load_ground_any(size, preferred="ground_greye.png"):
     pref_path = os.path.join('Images', 'sprites', preferred)
     if os.path.exists(pref_path):
         return load_tile(preferred, size)
 
-    # Search for any foreground_*.png
-    candidates = glob.glob(os.path.join('Images', 'sprites', 'foreground_*.png'))
+    # Search for any ground_*.png
+    candidates = glob.glob(os.path.join('Images', 'sprites', 'ground_*.png'))
     candidates.sort()
     if candidates:
         try:
@@ -82,37 +82,37 @@ def draw_grid(surface, rows, cols, cell_size, offset):
                          (offset.x + c * cell_size, offset.y + rows * cell_size))
 
 # --- Helper for large tile placement ---
-def is_top_left_of_large_tile(row, col, cell, grid_map):
+def is_top_left_of_large_tile(row, col, cell, tile_map):
     # Safely check neighbors when rows may have different lengths.
     above_different = True
     if row > 0:
-        if col < len(grid_map[row - 1]):
-            above_different = (grid_map[row - 1][col] != cell)
+        if col < len(tile_map[row - 1]):
+            above_different = (tile_map[row - 1][col] != cell)
         else:
             above_different = True
 
     left_different = True
     if col > 0:
-        if col - 1 < len(grid_map[row]):
-            left_different = (grid_map[row][col - 1] != cell)
+        if col - 1 < len(tile_map[row]):
+            left_different = (tile_map[row][col - 1] != cell)
         else:
             left_different = True
 
     return above_different and left_different
 
 # --- Build tile objects from grid ---
-def build_tiles(grid_map, small_size):
+def build_tiles(tile_map, small_size):
     tiles = []
-    for row in range(len(grid_map)):
-        for col in range(len(grid_map[row])):
-            cell = grid_map[row][col]
+    for row in range(len(tile_map)):
+        for col in range(len(tile_map[row])):
+            cell = tile_map[row][col]
             if cell is None:
                 continue
             w, h = cell.get_size()
             x = col * small_size[0]
             y = row * small_size[0]
             if w > small_size[0] or h > small_size[1]:
-                if is_top_left_of_large_tile(row, col, cell, grid_map):
+                if is_top_left_of_large_tile(row, col, cell, tile_map):
                     tiles.append(Tile(cell, x, y))
             else:
                 tiles.append(Tile(cell, x, y))
@@ -131,7 +131,7 @@ AA = Key('AA')
 BA = Key('BA')
 BB = Key('BB')
 FG = Key('FG')
-# additional foreground tile keys (two-letter tokens starting with F)
+# additional ground tile keys (two-letter tokens starting with F)
 FA = Key('FA')  # center.png
 FB = Key('FB')  # curve_in_bl.png
 FC = Key('FC')  # curve_in_br.png
@@ -153,7 +153,7 @@ def load_tile_surfaces(small_size, large_size):
         'BA': load_tile("Basic Tile Claw Mark.png", large_size),
         'BB': load_tile("Basic Tile Hole.png", large_size),
         'FG': load_tile("ground_grey.png", small_size),
-        # foreground-specific tiles (two-letter F* keys)
+    # ground-specific tiles (two-letter F* keys)
         'FA': load_tile("center.png", small_size),
         'FB': load_tile("curve_in_bl.png", small_size),
         'FC': load_tile("curve_in_br.png", small_size),
@@ -172,7 +172,13 @@ assets = load_tile_surfaces(small_size, large_size)
 
 # --- Map templates (single source of truth) ---
 # Use short keys in templates; we'll resolve them to loaded surfaces with resolve_map().
-grid_template = [
+background_template = [
+    [AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA],
+    [AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA],
+    [AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA],
+    [AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA],
+    [AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA],
+    [AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA],
     [AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA],
     [AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA],
     [AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA],
@@ -185,10 +191,16 @@ grid_template = [
     [AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA],
 ]
 
-foreground_template = [
+ground_template = [
     [FA, FA, FI, FI, FI, FI, FI, FI, FI, FI, FD, NA, NA, NA, NA, NA, NA, NA, NA, NA],
     [FA, FD, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA],
     [FK, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA],
+    [FJ, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA],
+    [FJ, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA],
+    [FJ, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA],
+    [FJ, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA],
+    [FJ, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA],
+    [FJ, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA],
     [FJ, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA],
     [FJ, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA],
     [FK, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA],
@@ -224,16 +236,16 @@ def resolve_map(template, key_map):
     return out
 
 # resolve initial maps using loaded assets
-grid_map = resolve_map(grid_template, assets)
-foreground_map = resolve_map(foreground_template, assets)
+background_map = resolve_map(background_template, assets)
+ground_map = resolve_map(ground_template, assets)
 
-background_tiles = build_tiles(grid_map, small_size)
-foreground_tiles = build_tiles(foreground_map, small_size)
+background_tiles = build_tiles(background_map, small_size)
+ground_tiles = build_tiles(ground_map, small_size)
 
 
 def save_templates_to_file():
-    """Serialize grid_template and foreground_template back into this python file.
-    This will overwrite the list literals for `grid_template` and `foreground_template` in-place.
+    """Serialize grid_template and ground_template back into this python file.
+    This will overwrite the list literals for `grid_template` and `ground_template` in-place.
     A backup of the original file will be written with a .bak suffix.
     """
     import io, time
@@ -263,8 +275,8 @@ def save_templates_to_file():
         s += ']'
         return s
 
-    grid_code = template_to_block(grid_template)
-    fg_code = template_to_block(foreground_template)
+    grid_code = template_to_block(background_template)
+    fg_code = template_to_block(ground_template)
 
     with open(path, 'r', encoding='utf-8') as f:
         src = f.read()
@@ -296,8 +308,8 @@ def save_templates_to_file():
         new_src = src[:start] + code_block + src[end+1:]
         return new_src
 
-    new_src = replace_var(src, 'grid_template', grid_code)
-    new_src = replace_var(new_src, 'foreground_template', fg_code)
+    new_src = replace_var(src, 'background_template', grid_code)
+    new_src = replace_var(new_src, 'ground_template', fg_code)
 
     # write backup then overwrite
     bak_path = path + '.bak'
@@ -329,7 +341,7 @@ jump_speed = -11
 on_ground = False
 
 def resolve_player_collisions(dx, dy):
-    """Move player by dx,dy and resolve collisions with foreground_tiles using masks.
+    """Move player by dx,dy and resolve collisions with ground_tiles using masks.
     This performs AABB checks first for speed, then mask.overlap to confirm pixel collision.
     Returns tuple (landed:boolean) indicating if player is standing on something after vertical move.
     """
@@ -342,7 +354,7 @@ def resolve_player_collisions(dx, dy):
         while True:
             overlapped_any = False
             # find first overlapping tile
-            for tile in foreground_tiles:
+            for tile in ground_tiles:
                 if player_rect.colliderect(tile.rect):
                     orig_offset = (tile.rect.x - player_rect.x, tile.rect.y - player_rect.y)
                     if player_mask.overlap(tile.mask, orig_offset):
@@ -363,7 +375,7 @@ def resolve_player_collisions(dx, dy):
                                 if player_mask.overlap(tile.mask, new_offset) is None:
                                     # make sure stepping up doesn't immediately collide with other tiles
                                     conflict = False
-                                    for other in foreground_tiles:
+                                    for other in ground_tiles:
                                         if other is tile:
                                             continue
                                         if player_rect.colliderect(other.rect):
@@ -416,7 +428,7 @@ def resolve_player_collisions(dx, dy):
         safety = 0
         while True:
             overlapped_any = False
-            for tile in foreground_tiles:
+            for tile in ground_tiles:
                 if player_rect.colliderect(tile.rect):
                     orig_offset = (tile.rect.x - player_rect.x, tile.rect.y - player_rect.y)
                     if player_mask.overlap(tile.mask, orig_offset):
@@ -449,7 +461,7 @@ def resolve_player_collisions(dx, dy):
         # After vertical resolution, determine landing / head-hit
         if dy > 0:
             player_rect.y += 1
-            for tile in foreground_tiles:
+            for tile in ground_tiles:
                 if player_rect.colliderect(tile.rect):
                     offset = (tile.rect.x - player_rect.x, tile.rect.y - player_rect.y)
                     if player_mask.overlap(tile.mask, offset):
@@ -459,7 +471,7 @@ def resolve_player_collisions(dx, dy):
             player_rect.y -= 1
         elif dy < 0:
             player_rect.y -= 1
-            for tile in foreground_tiles:
+            for tile in ground_tiles:
                 if player_rect.colliderect(tile.rect):
                     offset = (tile.rect.x - player_rect.x, tile.rect.y - player_rect.y)
                     if player_mask.overlap(tile.mask, offset):
@@ -478,7 +490,7 @@ camera_follows = True
 running = True
 # Editor state
 editor_mode = False
-editing_foreground = False  # if True edit foreground_template, else grid_template
+editing_ground = False  # if True edit ground_template, else background_template
 # order of editable keys (two-letter names) for selection with + / -
 key_order = ['AA', 'BA', 'BB', 'FG', 'FA', 'FB', 'FC', 'FD', 'FE', 'FF', 'FH', 'FI', 'FJ', 'FK', 'FL', 'FM']
 selected_idx = 0
@@ -509,10 +521,10 @@ while running:
                 small_size, large_size = get_tile_sizes(screen.get_size())
                 # reload assets at the new size and rebuild maps
                 assets = load_tile_surfaces(small_size, large_size)
-                grid_map = resolve_map(grid_template, assets)
-                foreground_map = resolve_map(foreground_template, assets)
-                background_tiles = build_tiles(grid_map, small_size)
-                foreground_tiles = build_tiles(foreground_map, small_size)
+                background_map = resolve_map(background_template, assets)
+                ground_map = resolve_map(ground_template, assets)
+                background_tiles = build_tiles(background_map, small_size)
+                ground_tiles = build_tiles(ground_map, small_size)
             elif event.key == pygame.K_d:
                 # toggle editor mode
                 editor_mode = not editor_mode
@@ -526,8 +538,8 @@ while running:
             elif event.key == pygame.K_h:
                 show_help = not show_help
             elif event.key == pygame.K_t:
-                # toggle editing layer between grid_template and foreground_template
-                editing_foreground = not editing_foreground
+                # toggle editing layer between background_template and ground_template
+                editing_ground = not editing_ground
             elif event.key in (pygame.K_EQUALS, pygame.K_PLUS):
                 # next tile
                 selected_idx = (selected_idx + 1) % len(key_order)
@@ -546,10 +558,10 @@ while running:
             small_size, large_size = get_tile_sizes((event.w, event.h))
             # reload assets at the new size and rebuild maps
             assets = load_tile_surfaces(small_size, large_size)
-            grid_map = resolve_map(grid_template, assets)
-            foreground_map = resolve_map(foreground_template, assets)
-            background_tiles = build_tiles(grid_map, small_size)
-            foreground_tiles = build_tiles(foreground_map, small_size)
+            background_map = resolve_map(background_template, assets)
+            ground_map = resolve_map(ground_template, assets)
+            background_tiles = build_tiles(background_map, small_size)
+            ground_tiles = build_tiles(ground_map, small_size)
         elif event.type == pygame.MOUSEBUTTONDOWN and editor_mode:
             # place or erase tiles in the active template
             mx, my = event.pos
@@ -559,7 +571,7 @@ while running:
             col = int(wx // small_size[0])
             row = int(wy // small_size[1])
             # pick the active template
-            template = foreground_template if editing_foreground else grid_template
+            template = ground_template if editing_ground else background_template
             if 0 <= row < len(template) and 0 <= col < len(template[row]):
                 if event.button == 1:
                     # left click: place selected tile token
@@ -570,10 +582,10 @@ while running:
                     # right click: clear
                     template[row][col] = NA
                 # after modification rebuild resolved maps and tiles
-                grid_map = resolve_map(grid_template, assets)
-                foreground_map = resolve_map(foreground_template, assets)
-                background_tiles = build_tiles(grid_map, small_size)
-                foreground_tiles = build_tiles(foreground_map, small_size)
+                background_map = resolve_map(background_template, assets)
+                ground_map = resolve_map(ground_template, assets)
+                background_tiles = build_tiles(background_map, small_size)
+                ground_tiles = build_tiles(ground_map, small_size)
                 
 
     keys = pygame.key.get_pressed()
@@ -637,7 +649,7 @@ while running:
         wy = my - camera_offset.y
         col = int(wx // small_size[0])
         row = int(wy // small_size[1])
-        template = foreground_template if editing_foreground else grid_template
+        template = ground_template if editing_ground else background_template
         if 0 <= row < len(template) and 0 <= col < len(template[row]):
             token_name = key_order[selected_idx]
             surf = assets.get(token_name)
@@ -658,8 +670,8 @@ while running:
     if not editor_mode:
         screen.blit(player_image, (int(player_rect.x + camera_offset.x), int(player_rect.y + camera_offset.y)))
 
-    # Draw foreground tiles on top of the player
-    for tile in foreground_tiles:
+    # Draw ground tiles on top of the player
+    for tile in ground_tiles:
         tile.draw(screen, camera_offset)
 
     # draw hover preview last so it's on top
@@ -670,7 +682,7 @@ while running:
     font = pygame.font.SysFont(None, 20)
     help_lines = [
         "D - Toggle Editor Mode (enter/exit)",
-        "T - Switch Layer (Grid / Foreground)",
+        "T - Switch Layer (Grid / Ground)",
         "+ / - - Change selected tile",
         "Mouse L - Place tile  |  Mouse R - Erase tile",
         "S - Save templates to this python file (creates .bak backup)",
@@ -698,13 +710,13 @@ while running:
         status_y = top_y + 4
 
     # draw concise status below help/hint
-    status = f"MODE: {'EDITOR' if editor_mode else 'PLAY'}  LAYER: {'FOREGROUND' if editing_foreground else 'GRID'}  SELECT: {key_order[selected_idx]}"
+    status = f"MODE: {'EDITOR' if editor_mode else 'PLAY'}  LAYER: {'GROUND' if editing_ground else 'GRID'}  SELECT: {key_order[selected_idx]}"
     status_surf = font.render(status, True, (220, 220, 220))
     screen.blit(status_surf, (8, status_y))
 
     if show_grid:
-        cols = max((len(r) for r in grid_map), default=0)
-        draw_grid(screen, len(grid_map), cols, small_size[0], camera_offset)
+        cols = max((len(r) for r in background_map), default=0)
+        draw_grid(screen, len(background_map), cols, small_size[0], camera_offset)
 
     pygame.display.flip()
     clock.tick(60)
