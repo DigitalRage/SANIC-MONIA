@@ -1,7 +1,7 @@
-import pygame
 import os
 import glob
-
+os.environ['SDL_AUDIODRIVER'] = 'dummy'
+import pygame # Now import pygame
 # --- Setup ---
 pygame.init()
 windowed_size = (800, 600)
