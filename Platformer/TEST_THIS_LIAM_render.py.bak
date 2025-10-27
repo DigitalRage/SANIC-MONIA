@@ -83,16 +83,28 @@ def draw_grid(surface, rows, cols, cell_size, offset):
 
 # --- Helper for large tile placement ---
 def is_top_left_of_large_tile(row, col, cell, grid_map):
-    return (
-        (row == 0 or grid_map[row - 1][col] != cell) and
-        (col == 0 or grid_map[row][col - 1] != cell)
-    )
+    # Safely check neighbors when rows may have different lengths.
+    above_different = True
+    if row > 0:
+        if col < len(grid_map[row - 1]):
+            above_different = (grid_map[row - 1][col] != cell)
+        else:
+            above_different = True
+
+    left_different = True
+    if col > 0:
+        if col - 1 < len(grid_map[row]):
+            left_different = (grid_map[row][col - 1] != cell)
+        else:
+            left_different = True
+
+    return above_different and left_different
 
 # --- Build tile objects from grid ---
 def build_tiles(grid_map, small_size):
     tiles = []
     for row in range(len(grid_map)):
-        for col in range(len(grid_map[0])):
+        for col in range(len(grid_map[row])):
             cell = grid_map[row][col]
             if cell is None:
                 continue
@@ -162,20 +174,28 @@ assets = load_tile_surfaces(small_size, large_size)
 # Use short keys in templates; we'll resolve them to loaded surfaces with resolve_map().
 grid_template = [
     [AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA],
-    [AA, BA, NA, AA, AA, AA, BA, NA, AA, AA, AA, BA, NA, AA, AA, AA, BA, NA, AA, AA],
-    [AA, NA, NA, AA, AA, AA, NA, NA, AA, AA, AA, NA, NA, AA, AA, AA, NA, NA, AA, AA],
-    [AA, AA, AA, BB, NA, AA, AA, AA, BB, NA, AA, AA, AA, BB, NA, AA, AA, AA, BB, NA],
-    [AA, AA, AA, NA, NA, AA, AA, AA, NA, NA, AA, AA, AA, NA, NA, AA, AA, AA, NA, NA],
+    [AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA],
+    [AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA],
+    [AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA],
+    [AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA],
+    [AA, BA, NA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA],
+    [AA, NA, NA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA],
+    [AA, AA, AA, BB, NA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA],
+    [AA, AA, AA, NA, NA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA],
     [AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA, AA],
 ]
 
 foreground_template = [
-    [FD, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA],
-    [NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA],
-    [NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA],
-    [NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA],
-    [NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA],
-    [FG, FG, FG, FG, FG, FG, FG, FG, FG, FG, FG, FG, FG, FG, FG, FG, FG, FG, FG, FG],
+    [FA, FA, FI, FI, FI, FI, FI, FI, FI, FI, FD, NA, NA, NA, NA, NA, NA, NA, NA, NA],
+    [FA, FD, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA],
+    [FK, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA],
+    [FJ, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA],
+    [FJ, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA],
+    [FK, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA],
+    [FK, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA],
+    [FJ, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA],
+    [FA, FB, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA],
+    [FA, FA, FG, FG, FG, FG, FG, FG, FG, FG, FG, FG, FG, FG, FG, FG, FG, FG, FG, FG],
 ]
 
 
@@ -314,36 +334,139 @@ def resolve_player_collisions(dx, dy):
     Returns tuple (landed:boolean) indicating if player is standing on something after vertical move.
     """
     landed = False
-    # horizontal move
+
+    # Horizontal move: move then resolve pixel-perfect using a minimum translation search
     if dx != 0:
         player_rect.x += dx
-        for tile in foreground_tiles:
-            if player_rect.colliderect(tile.rect):
-                # compute mask-relative offset
-                rel = (player_rect.x - tile.rect.x, player_rect.y - tile.rect.y)
-                if tile.mask.overlap(player_mask, rel):
-                    # resolve by pushing out along x
-                    if dx > 0:
-                        player_rect.right = tile.rect.left
-                    else:
-                        player_rect.left = tile.rect.right
+        safety = 0
+        while True:
+            overlapped_any = False
+            # find first overlapping tile
+            for tile in foreground_tiles:
+                if player_rect.colliderect(tile.rect):
+                    orig_offset = (tile.rect.x - player_rect.x, tile.rect.y - player_rect.y)
+                    if player_mask.overlap(tile.mask, orig_offset):
+                        overlapped_any = True
 
-    # vertical move
+                        # Attempt a small step-up (auto-step) when on the ground to climb low obstacles
+                        stepped = False
+                        try:
+                            ground_state = on_ground
+                        except NameError:
+                            ground_state = False
+                        if ground_state:
+                            max_step = max(1, small_size[1] // 3)
+                            for s in range(1, max_step + 1):
+                                # try moving player up by s pixels
+                                player_rect.y -= s
+                                new_offset = (tile.rect.x - player_rect.x, tile.rect.y - player_rect.y)
+                                if player_mask.overlap(tile.mask, new_offset) is None:
+                                    # make sure stepping up doesn't immediately collide with other tiles
+                                    conflict = False
+                                    for other in foreground_tiles:
+                                        if other is tile:
+                                            continue
+                                        if player_rect.colliderect(other.rect):
+                                            other_off = (other.rect.x - player_rect.x, other.rect.y - player_rect.y)
+                                            if player_mask.overlap(other.mask, other_off):
+                                                conflict = True
+                                                break
+                                    if not conflict:
+                                        # successful step up
+                                        stepped = True
+                                        landed = True
+                                        break
+                                # restore and try next
+                                player_rect.y += s
+
+                        # compute overlap rect to bound horizontal search
+                        overlap_rect = player_rect.clip(tile.rect)
+                        max_dx = overlap_rect.width
+
+                        best = None
+                        # search horizontal translations (left/right)
+                        for n in range(1, max(1, max_dx) + 1):
+                            # move left by n -> dx = -n
+                            new_offset_left = (orig_offset[0] + n, orig_offset[1])
+                            if player_mask.overlap(tile.mask, new_offset_left) is None:
+                                cand = (-n, 0)
+                                best = cand
+                                break
+                            # move right by n -> dx = +n
+                            new_offset_right = (orig_offset[0] - n, orig_offset[1])
+                            if player_mask.overlap(tile.mask, new_offset_right) is None:
+                                cand = (n, 0)
+                                best = cand
+                                break
+
+                        if best is not None:
+                            # apply translation and restart checks
+                            player_rect.x += best[0]
+                        else:
+                            # fallback: small step back depending on original dx sign
+                            player_rect.x -= 1 if dx > 0 else -1
+                        break
+            safety += 1
+            if not overlapped_any or safety > abs(dx) + 1024:
+                break
+
+    # Vertical move: minimum translation search along Y
     if dy != 0:
         player_rect.y += dy
-        for tile in foreground_tiles:
-            if player_rect.colliderect(tile.rect):
-                rel = (player_rect.x - tile.rect.x, player_rect.y - tile.rect.y)
-                if tile.mask.overlap(player_mask, rel):
-                    if dy > 0:
-                        # falling, land on top
-                        player_rect.bottom = tile.rect.top
+        safety = 0
+        while True:
+            overlapped_any = False
+            for tile in foreground_tiles:
+                if player_rect.colliderect(tile.rect):
+                    orig_offset = (tile.rect.x - player_rect.x, tile.rect.y - player_rect.y)
+                    if player_mask.overlap(tile.mask, orig_offset):
+                        overlapped_any = True
+                        overlap_rect = player_rect.clip(tile.rect)
+                        max_dy = overlap_rect.height
+
+                        best = None
+                        for n in range(1, max(1, max_dy) + 1):
+                            # move up by n -> dy = -n
+                            new_offset_up = (orig_offset[0], orig_offset[1] + n)
+                            if player_mask.overlap(tile.mask, new_offset_up) is None:
+                                best = (0, -n)
+                                break
+                            # move down by n -> dy = +n
+                            new_offset_down = (orig_offset[0], orig_offset[1] - n)
+                            if player_mask.overlap(tile.mask, new_offset_down) is None:
+                                best = (0, n)
+                                break
+
+                        if best is not None:
+                            player_rect.y += best[1]
+                        else:
+                            player_rect.y -= 1 if dy > 0 else -1
+                        break
+            safety += 1
+            if not overlapped_any or safety > abs(dy) + 1024:
+                break
+
+        # After vertical resolution, determine landing / head-hit
+        if dy > 0:
+            player_rect.y += 1
+            for tile in foreground_tiles:
+                if player_rect.colliderect(tile.rect):
+                    offset = (tile.rect.x - player_rect.x, tile.rect.y - player_rect.y)
+                    if player_mask.overlap(tile.mask, offset):
                         landed = True
                         vel.y = 0
-                    elif dy < 0:
-                        # hit head
-                        player_rect.top = tile.rect.bottom
+                        break
+            player_rect.y -= 1
+        elif dy < 0:
+            player_rect.y -= 1
+            for tile in foreground_tiles:
+                if player_rect.colliderect(tile.rect):
+                    offset = (tile.rect.x - player_rect.x, tile.rect.y - player_rect.y)
+                    if player_mask.overlap(tile.mask, offset):
                         vel.y = 0
+                        break
+            player_rect.y += 1
+
     return landed
 
 # --- Main loop ---
@@ -437,7 +560,7 @@ while running:
             row = int(wy // small_size[1])
             # pick the active template
             template = foreground_template if editing_foreground else grid_template
-            if 0 <= row < len(template) and 0 <= col < len(template[0]):
+            if 0 <= row < len(template) and 0 <= col < len(template[row]):
                 if event.button == 1:
                     # left click: place selected tile token
                     token_name = key_order[selected_idx]
@@ -451,6 +574,7 @@ while running:
                 foreground_map = resolve_map(foreground_template, assets)
                 background_tiles = build_tiles(grid_map, small_size)
                 foreground_tiles = build_tiles(foreground_map, small_size)
+                
 
     keys = pygame.key.get_pressed()
     # camera controls
@@ -514,7 +638,7 @@ while running:
         col = int(wx // small_size[0])
         row = int(wy // small_size[1])
         template = foreground_template if editing_foreground else grid_template
-        if 0 <= row < len(template) and 0 <= col < len(template[0]):
+        if 0 <= row < len(template) and 0 <= col < len(template[row]):
             token_name = key_order[selected_idx]
             surf = assets.get(token_name)
             if surf is not None:
@@ -537,10 +661,6 @@ while running:
     # Draw foreground tiles on top of the player
     for tile in foreground_tiles:
         tile.draw(screen, camera_offset)
-        if tile.collides_with(player_rect, player_mask, camera_offset):
-            # Draw collision rect in screen coordinates
-            screen_rect = tile.rect.move(int(camera_offset.x), int(camera_offset.y))
-            pygame.draw.rect(screen, (255, 0, 0), screen_rect, 2)
 
     # draw hover preview last so it's on top
     if hover_preview and hover_pos:
@@ -583,7 +703,8 @@ while running:
     screen.blit(status_surf, (8, status_y))
 
     if show_grid:
-        draw_grid(screen, len(grid_map), len(grid_map[0]), small_size[0], camera_offset)
+        cols = max((len(r) for r in grid_map), default=0)
+        draw_grid(screen, len(grid_map), cols, small_size[0], camera_offset)
 
     pygame.display.flip()
     clock.tick(60)
