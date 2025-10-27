@@ -194,8 +194,8 @@ foreground_template = [
     [FK, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA],
     [FK, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA],
     [FJ, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA],
-    [FA, FB, NA, NA, NA, FH, FG, FF, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA],
-    [FA, FA, FG, FG, FG, FA, FA, FA, FG, FG, FG, FG, FG, FG, FG, FG, FG, FG, FG, FG],
+    [FA, FB, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA],
+    [FA, FA, FG, FG, FG, FG, FG, FG, FG, FG, FG, FG, FG, FG, FG, FG, FG, FG, FG, FG],
 ]
 
 
