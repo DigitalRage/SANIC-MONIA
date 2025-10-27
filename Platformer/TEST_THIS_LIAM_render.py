@@ -242,6 +242,40 @@ ground_map = resolve_map(ground_template, assets)
 background_tiles = build_tiles(background_map, small_size)
 ground_tiles = build_tiles(ground_map, small_size)
 
+# --- Multi-room support ---
+# start with a single room using the existing templates
+rooms = [
+    {
+        'background_template': background_template,
+        'ground_template': ground_template,
+        'name': 'Room 0',
+    }
+]
+
+current_room = 0
+
+def rebuild_maps_and_tiles():
+    global background_map, ground_map, background_tiles, ground_tiles
+    background_map = resolve_map(background_template, assets)
+    ground_map = resolve_map(ground_template, assets)
+    background_tiles = build_tiles(background_map, small_size)
+    ground_tiles = build_tiles(ground_map, small_size)
+
+def load_room(idx: int):
+    """Switch to room `idx` (wraps)."""
+    global current_room, background_template, ground_template
+    current_room = idx % len(rooms)
+    background_template = rooms[current_room]['background_template']
+    ground_template = rooms[current_room]['ground_template']
+    rebuild_maps_and_tiles()
+
+def next_room():
+    load_room(current_room + 1)
+
+def prev_room():
+    load_room(current_room - 1)
+
+
 
 def save_templates_to_file():
     """Serialize grid_template and ground_template back into this python file.
@@ -552,6 +586,17 @@ while running:
                     print('Templates saved to file')
                 except Exception as e:
                     print('Failed to save templates:', e)
+            elif event.key == pygame.K_RIGHTBRACKET:
+                # next room
+                try:
+                    next_room()
+                except Exception:
+                    pass
+            elif event.key == pygame.K_LEFTBRACKET:
+                try:
+                    prev_room()
+                except Exception:
+                    pass
 
         elif event.type == pygame.VIDEORESIZE:
             screen = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
@@ -710,7 +755,7 @@ while running:
         status_y = top_y + 4
 
     # draw concise status below help/hint
-    status = f"MODE: {'EDITOR' if editor_mode else 'PLAY'}  LAYER: {'GROUND' if editing_ground else 'GRID'}  SELECT: {key_order[selected_idx]}"
+    status = f"MODE: {'EDITOR' if editor_mode else 'PLAY'}  ROOM: {rooms[current_room]['name']}  LAYER: {'GROUND' if editing_ground else 'GRID'}  SELECT: {key_order[selected_idx]}"
     status_surf = font.render(status, True, (220, 220, 220))
     screen.blit(status_surf, (8, status_y))
 
