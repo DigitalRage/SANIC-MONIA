@@ -2,6 +2,13 @@ import pygame
 import os
 import glob
 
+# --- Music ---
+pygame.init()
+pygame.mixer.init()
+pygame.mixer.music.load("Music cuz why not/Joyful Tone.mp3")  # Replace with your file path
+pygame.mixer.music.play()
+
+
 # --- Setup ---
 pygame.init()
 windowed_size = (800, 600)
