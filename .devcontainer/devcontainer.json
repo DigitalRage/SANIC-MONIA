@@ -1,0 +1,14 @@
+{
+	"image": "mcr.microsoft.com/devcontainers/universal:latest",
+	"features": {
+	  "ghcr.io/devcontainers/features/desktop-lite:1": {}
+	},
+	"customizations": {
+	  "vscode": {
+		"extensions": [
+		  "ms-python.python"
+		]
+	  }
+	},
+	"postCreateCommand": "pip install pygame"
+  }
