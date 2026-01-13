@@ -2,6 +2,15 @@ import pygame
 import os
 import glob
 import controller
+
+from TerminalRenderer import TerminalRenderer
+
+renderer = TerminalRenderer()
+renderer.patch_pygame_display()
+renderer.scale_factor(1)
+renderer.enter()
+
+
 # --- Music ---
 controller_on=True
 try:
@@ -1443,3 +1452,4 @@ while running:
     clock.tick(60)
 
 pygame.quit()
+renderer.exit()
